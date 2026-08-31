@@ -1,6 +1,7 @@
 from solver import Solver
 from scipy.optimize import linprog
 from itertools import combinations
+from graficador import graficar
 import numpy as np
 
 class MetodoGrafico(Solver):
@@ -10,6 +11,16 @@ class MetodoGrafico(Solver):
         if len(self.coefObjetivo) != 2:
             raise ValueError("El método gráfico solo es aplicable a problemas con dos variables de decisión.")
 
+        lineas = self._construir_lineas()
+        intersecciones = self._hallar_intersecciones(lineas)
+        vertices = self._filtrar_factibles(intersecciones)
+        if len(vertices) == 0:
+            raise ValueError("No se encontró una región factible.")
+        punto_optimo, z_optimo = self._evaluar_objetivo(vertices)
+
+        graficar(self.restricciones, vertices, punto_optimo, z_optimo)
+
+        return punto_optimo, z_optimo
 
     def construirLineas(self):
         lineas = [(r.coeficientes[0], r.coeficientes[1], r.independiente)
