@@ -4,7 +4,7 @@ from scipy.spatial import ConvexHull
 import matplotlib.pyplot as plt
 
 
-def graficar(restricciones, vertices, punto_optimo, z_optimo):
+def graficar(restricciones, vertices, punto_optimo, z_optimo, mostrar=True):
     puntos = np.array(vertices)
 
     fig, ax = plt.subplots()
@@ -20,8 +20,11 @@ def graficar(restricciones, vertices, punto_optimo, z_optimo):
     ax.set_xlabel("x1")
     ax.set_ylabel("x2")
     ax.legend()
-    plt.show()
 
+    if mostrar:
+        plt.show()
+
+    return fig
 
 def _dibujar_region_factible(ax, puntos):
     if len(puntos) >= 3:

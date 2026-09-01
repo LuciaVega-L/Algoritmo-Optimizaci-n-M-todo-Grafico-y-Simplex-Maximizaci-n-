@@ -17,7 +17,7 @@ class MetodoGrafico(Solver):
             raise ValueError("No se encontró una región factible.")
         puntoOptimo, zOptimo = self.evaluarObjetivo(vertices)
 
-        graficar(self.restricciones, vertices, puntoOptimo, zOptimo)
+        self.figura = graficar(self.restricciones, vertices, puntoOptimo, zOptimo, mostrar=False)
 
         return puntoOptimo, zOptimo
 

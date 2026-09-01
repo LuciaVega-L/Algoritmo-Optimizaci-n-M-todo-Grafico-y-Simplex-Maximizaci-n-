@@ -20,9 +20,6 @@ class MetodoSimplex(Solver):
 
         return puntoOptimo, zOptimo
 
-    # -------------------------------------------------------------
-    # Paso 1: normalizar restricciones (>= se multiplica por -1)
-    # -------------------------------------------------------------
     def normalizarRestricciones(self):
         normalizadas = []
 
@@ -46,9 +43,6 @@ class MetodoSimplex(Solver):
 
         return normalizadas
 
-    # -------------------------------------------------------------
-    # Paso 2: construir la tabla inicial (base = variables de holgura)
-    # -------------------------------------------------------------
     def construirTableauInicial(self, restriccionesNormalizadas):
         numRestricciones = len(restriccionesNormalizadas)
         totalColumnas = self.numVariables + numRestricciones
@@ -77,9 +71,15 @@ class MetodoSimplex(Solver):
         self.variablesBasicas = variablesBasicas
         self.totalColumnas = totalColumnas
 
-    # -------------------------------------------------------------
-    # Paso 3: fase de corrección de factibilidad (RHS negativos)
-    # -------------------------------------------------------------
+        # Nombres legibles de cada columna: x1, x2, ..., s1, s2, ...
+        self.nombresColumnas = []
+        for j in range(self.numVariables):
+            self.nombresColumnas.append(f"x{j + 1}")
+        for i in range(numRestricciones):
+            self.nombresColumnas.append(f"s{i + 1}")
+
+        self.historial = []
+
     def corregirFactibilidad(self):
         iteracion = 0
 
@@ -87,11 +87,10 @@ class MetodoSimplex(Solver):
             filaPivote = self.elegirFilaNegativa()
 
             if filaPivote is None:
-                break  # ya no hay RHS negativos, la base es factible
+                break
 
             cjMenosZj, z = self.calcularCostosReducidos()
-            print(f"\n--- Corrección de factibilidad, iteración {iteracion} ---")
-            self.mostrarTableau(iteracion, cjMenosZj, z)
+            self.registrarIteracion("Corrección de factibilidad", iteracion, cjMenosZj, z)
 
             columnaPivote = self.elegirColumnaDual(filaPivote, cjMenosZj)
 
@@ -129,16 +128,13 @@ class MetodoSimplex(Solver):
 
         return columnaElegida
 
-    # -------------------------------------------------------------
-    # Paso 4: simplex normal (una vez la base ya es factible)
-    # -------------------------------------------------------------
+
     def optimizar(self):
         iteracion = 0
 
         while True:
             cjMenosZj, z = self.calcularCostosReducidos()
-            print(f"\n--- Optimización, iteración {iteracion} ---")
-            self.mostrarTableau(iteracion, cjMenosZj, z)
+            self.registrarIteracion("Optimización", iteracion, cjMenosZj, z)
 
             if self.esOptimo(cjMenosZj):
                 break
@@ -207,9 +203,6 @@ class MetodoSimplex(Solver):
 
         return mejorFila
 
-    # -------------------------------------------------------------
-    # Pivoteo (Gauss-Jordan) — igual para ambas fases
-    # -------------------------------------------------------------
     def pivotear(self, filaPivote, columnaPivote):
         elementoPivote = self.tabla[filaPivote][columnaPivote]
         self.tabla[filaPivote] = self.tabla[filaPivote] / elementoPivote
@@ -221,9 +214,7 @@ class MetodoSimplex(Solver):
 
         self.variablesBasicas[filaPivote] = columnaPivote
 
-    # -------------------------------------------------------------
-    # Paso 5: extraer la solución final
-    # -------------------------------------------------------------
+ 
     def extraerSolucion(self):
         valores = np.zeros(self.totalColumnas)
 
@@ -237,8 +228,24 @@ class MetodoSimplex(Solver):
 
         return puntoOptimo, zOptimo
 
-    def mostrarTableau(self, iteracion, cjMenosZj, z):
-        print("Variables básicas:", self.variablesBasicas)
+    def registrarIteracion(self, fase, iteracion, cjMenosZj, z):
+        nombreVariablesBasicas = []
+        for indice in self.variablesBasicas:
+            nombreVariablesBasicas.append(self.nombresColumnas[indice])
+
+        snapshot = {
+            "fase": fase,
+            "iteracion": iteracion,
+            "nombresColumnas": list(self.nombresColumnas),
+            "nombreVariablesBasicas": nombreVariablesBasicas,
+            "tabla": self.tabla.copy(),
+            "cjMenosZj": cjMenosZj.copy(),
+            "z": z,
+        }
+        self.historial.append(snapshot)
+
+        print(f"\n--- {fase}, iteración {iteracion} ---")
+        print("Variables básicas:", nombreVariablesBasicas)
         print("Tabla:")
         print(np.round(self.tabla, 3))
         print("Cj - Zj:", np.round(cjMenosZj, 3))
