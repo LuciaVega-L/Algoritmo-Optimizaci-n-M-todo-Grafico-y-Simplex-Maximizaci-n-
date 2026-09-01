@@ -1,0 +1,33 @@
+# Bytecode y cache de Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# Entornos virtuales
+venv/
+env/
+.venv/
+ENV/
+
+# Archivos de configuración de editores/IDEs
+.vscode/
+.idea/
+*.code-workspace
+
+# Archivos del sistema operativo
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Distribución / empaquetado (por si algún día generas un .exe)
+build/
+dist/
+*.egg-info/
+
+# Logs y archivos temporales
+*.log
+*.tmp
+
+# Archivos de configuración local / secretos (si algún día los usas)
+.env
