@@ -20,7 +20,7 @@ def pedirDatosModelo():
     numVariables = int(input("Número de variables de decisión: "))
 
     funcObj = input("Ingrese la función objetivo (ejemplo: 3x1 + 5x2): ")
-    obtenerCoeficientesFuncObj(funcObj)
+    obtenerCoeficientesFuncObj(funcObj, numVariables)
 
     numRestricciones = int(input("Ingrese numero de restricciones: "))
     for i in range(numRestricciones):

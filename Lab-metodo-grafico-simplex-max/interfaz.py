@@ -2,6 +2,8 @@ import customtkinter as ctk
 from tkinter import messagebox
 import contextlib
 import io
+from tkinter import messagebox
+from tkinter import ttk
 
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
 
@@ -277,7 +279,7 @@ class interfaz(ctk.CTk):
         restricciones.clear()
 
         try:
-            obtenerCoeficientesFuncObj(self.entradaFuncObj.get())
+            obtenerCoeficientesFuncObj(self.entradaFuncObj.get(), self.numVariables)
 
             for entrada in self.entradasRestricciones:
                 obtenerCoeficientesRestricciones(entrada.get(), self.numVariables)
@@ -373,73 +375,34 @@ class interfaz(ctk.CTk):
     # Mostrar cada iteración del simplex como pestañas (CTkTabview)
     # -------------------------------------------------------------
     def mostrarIteracionesSimplex(self, historial):
-        tabview = ctk.CTkTabview(self.contenedor, height=250)
-        tabview.pack(fill="both", expand=True, pady=10)
+        notebook = ttk.Notebook(self.contenedor)
+        notebook.pack(fill="both", expand=True, pady=10)
 
         for snapshot in historial:
-            titulo_pestana = f"{snapshot['fase']} #{snapshot['iteracion']}"
-            tab = tabview.add(titulo_pestana)
+            pestana = ttk.Frame(notebook)
+            titulo = f"{snapshot['fase']} #{snapshot['iteracion']}"
+            notebook.add(pestana, text=titulo)
 
             columnas = ["Base"] + snapshot["nombresColumnas"] + ["RHS"]
 
-            # Contenedor de la tabla simulada
-            tabla_frame = ctk.CTkScrollableFrame(tab, fg_color="transparent")
-            tabla_frame.pack(fill="both", expand=True)
+            tabla = ttk.Treeview(pestana, columns=columnas, show="headings", height=8)
+            for col in columnas:
+                tabla.heading(col, text=col)
+                tabla.column(col, width=70, anchor="center")
+            tabla.pack(fill="both", expand=True)
 
-            # Encabezado
-            for col_idx, text_col in enumerate(columnas):
-                lbl_enc = ctk.CTkLabel(
-                    tabla_frame,
-                    text=text_col,
-                    font=ctk.CTkFont(size=12, weight="bold"),
-                    fg_color="#E2E8F0",
-                    corner_radius=4,
-                    width=75,
-                    height=28
-                )
-                lbl_enc.grid(row=0, column=col_idx, padx=2, pady=2)
-
-            # Filas de datos
             numFilas = snapshot["tabla"].shape[0]
             for i in range(numFilas):
                 nombreBase = snapshot["nombreVariablesBasicas"][i]
                 valores = [round(v, 3) for v in snapshot["tabla"][i]]
                 fila = [nombreBase] + valores
+                tabla.insert("", "end", values=fila)
 
-                for col_idx, val in enumerate(fila):
-                    lbl_val = ctk.CTkLabel(
-                        tabla_frame,
-                        text=str(val),
-                        font=ctk.CTkFont(size=11),
-                        fg_color="#F8FAFC",
-                        corner_radius=4,
-                        width=75,
-                        height=26
-                    )
-                    lbl_val.grid(row=i + 1, column=col_idx, padx=2, pady=2)
+            valoresCjMenosZj = [round(v, 3) for v in snapshot["cjMenosZj"]]
+            filaZ = ["Z"] + valoresCjMenosZj + [round(snapshot["z"], 3)]
+            tabla.insert("", "end", values=filaZ, tags=("filaZ",))
 
-            # Fila Cj - Zj
-            filaCjZj = ["Cj-Zj"] + [round(v, 3) for v in snapshot["cjMenosZj"]] + [""]
-            for col_idx, val in enumerate(filaCjZj):
-                lbl_cj = ctk.CTkLabel(
-                    tabla_frame,
-                    text=str(val),
-                    font=ctk.CTkFont(size=11, weight="bold"),
-                    fg_color="#FEF3C7",  # Tono amarillo pastel para destacar la fila de control
-                    text_color="#92400E",
-                    corner_radius=4,
-                    width=75,
-                    height=26
-                )
-                lbl_cj.grid(row=numFilas + 1, column=col_idx, padx=2, pady=2)
-
-            # Z de la iteración
-            ctk.CTkLabel(
-                tab,
-                text=f"Valor de Z = {round(snapshot['z'], 3)}",
-                font=ctk.CTkFont(size=13, weight="bold"),
-                text_color="#0F172A"
-            ).pack(anchor="e", pady=8, padx=10)
+            tabla.tag_configure("filaZ", background="#fff3cd")
 
 
 if __name__ == "__main__":
