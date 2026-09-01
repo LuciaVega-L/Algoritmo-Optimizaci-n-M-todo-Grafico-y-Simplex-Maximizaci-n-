@@ -1,5 +1,4 @@
 from solver import Solver
-from scipy.optimize import linprog
 from itertools import combinations
 from graficador import graficar
 import numpy as np
@@ -11,16 +10,16 @@ class MetodoGrafico(Solver):
         if len(self.coefObjetivo) != 2:
             raise ValueError("El método gráfico solo es aplicable a problemas con dos variables de decisión.")
 
-        lineas = self._construir_lineas()
-        intersecciones = self._hallar_intersecciones(lineas)
-        vertices = self._filtrar_factibles(intersecciones)
+        lineas = self.construirLineas()
+        intersecciones = self.hallarIntersecciones(lineas)
+        vertices = self.filtrarFactibles(intersecciones)
         if len(vertices) == 0:
             raise ValueError("No se encontró una región factible.")
-        punto_optimo, z_optimo = self._evaluar_objetivo(vertices)
+        puntoOptimo, zOptimo = self.evaluarObjetivo(vertices)
 
-        graficar(self.restricciones, vertices, punto_optimo, z_optimo)
+        graficar(self.restricciones, vertices, puntoOptimo, zOptimo)
 
-        return punto_optimo, z_optimo
+        return puntoOptimo, zOptimo
 
     def construirLineas(self):
         lineas = [(r.coeficientes[0], r.coeficientes[1], r.independiente)
@@ -32,7 +31,7 @@ class MetodoGrafico(Solver):
 
         return lineas
     
-    def hallarVertices(self, lineas):
+    def hallarIntersecciones(self, lineas):
         """Resuelve el sistema 2x2 para cada par de líneas."""
         puntos = []
         for (x1, x2, c1), (x3, x4, c2) in combinations(lineas, 2):
@@ -45,7 +44,7 @@ class MetodoGrafico(Solver):
                 continue  
         return puntos
     
-    def _es_factible(self, punto, tol=1e-9):
+    def esFactible(self, punto, tol=1e-9):
         x1 = punto[0]
         x2 = punto[1]
 
@@ -77,23 +76,45 @@ class MetodoGrafico(Solver):
         # Si pasó todas las pruebas, es factible
         return True
 
-    def _ya_existe(self, punto, lista_puntos, tol=1e-6):
+    def yaExiste(self, punto, lista_puntos, tol=1e-6):
         for p in lista_puntos:
             distancia = np.linalg.norm(np.array(punto) - np.array(p))
             if distancia < tol:
                 return True
         return False
 
-    def _filtrar_factibles(self, puntos):
+    def filtrarFactibles(self, puntos):
         vertices = []
 
         for p in puntos:
-            if self._es_factible(p):
-                if not self._ya_existe(p, vertices):
+            if self.esFactible(p):
+                if not self.yaExiste(p, vertices):
                     vertices.append(p)
 
         return vertices
 
-#resolver sol optima 
+    def evaluarObjetivo(self, vertices):
+        c1 = self.coefObjetivo[0]
+        c2 = self.coefObjetivo[1]
+
+        valoresZ = []
+        for v in vertices:
+            x1 = v[0]
+            x2 = v[1]
+            z = c1 * x1 + c2 * x2
+            valoresZ.append(z)
+
+        mejorIndice = 0
+        mejorZ = valoresZ[0]
+
+        for i in range(1, len(valoresZ)):
+            if valoresZ[i] > mejorZ:
+                mejorZ = valoresZ[i]
+                mejorIndice = i
+
+        puntoOptimo = vertices[mejorIndice]
+        zOptimo = mejorZ
+
+        return puntoOptimo, zOptimo
 
     
