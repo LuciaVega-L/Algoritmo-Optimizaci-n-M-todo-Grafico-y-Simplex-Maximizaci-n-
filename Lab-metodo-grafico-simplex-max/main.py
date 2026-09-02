@@ -96,7 +96,8 @@ class MetodoGrafico(Solver):
             raise ValueError("No se encontró una región factible.")
         puntoOptimo, zOptimo = self.evaluarObjetivo(vertices)
 
-        self.figura = graficar(self.restricciones, vertices, puntoOptimo, zOptimo, mostrar=False)
+        graficador = Graficador(self.restricciones, vertices, puntoOptimo, zOptimo)
+        self.figura = graficador.graficar(mostrar=False)
 
         return puntoOptimo, zOptimo
 
@@ -453,63 +454,73 @@ import numpy as np
 from scipy.spatial import ConvexHull
 import matplotlib.pyplot as plt
 
-
-def graficar(restricciones, vertices, punto_optimo, z_optimo, mostrar=True):
-    puntos = np.array(vertices)
-
-    fig, ax = plt.subplots()
-
-    _dibujar_region_factible(ax, puntos)
-
-    limite = _calcular_limite(puntos)
-    _dibujar_restricciones(ax, restricciones, limite)
-    _dibujar_punto_optimo(ax, punto_optimo, z_optimo)
-
-    ax.set_xlim(0, limite)
-    ax.set_ylim(0, limite)
-    ax.set_xlabel("x1")
-    ax.set_ylabel("x2")
-    ax.legend()
-
-    if mostrar:
-        plt.show()
-
-    return fig
-
-def _dibujar_region_factible(ax, puntos):
-    if len(puntos) >= 3:
-        hull = ConvexHull(puntos)
-        orden = puntos[hull.vertices]
-        ax.fill(orden[:, 0], orden[:, 1], alpha=0.3, label="Región factible")
+# graficador.py
+import numpy as np
+from scipy.spatial import ConvexHull
+import matplotlib.pyplot as plt
 
 
-def _calcular_limite(puntos):
-    if puntos.size > 0:
-        return puntos.max() * 1.2
-    else:
-        return 10
+class Graficador:
 
+    def __init__(self, restricciones, vertices, puntoOptimo, zOptimo):
+        self.restricciones = restricciones
+        self.puntos = np.array(vertices)
+        self.puntoOptimo = puntoOptimo
+        self.zOptimo = zOptimo
+        self.figura = None
+        self.ax = None
 
-def _dibujar_restricciones(ax, restricciones, limite):
-    x1_vals = np.linspace(0, limite, 200)
+    def graficar(self, mostrar=True):
+        self.figura, self.ax = plt.subplots()
 
-    for r in restricciones:
-        a1 = r.coeficientes[0]
-        a2 = r.coeficientes[1]
+        self.dibujarRegionFactible()
 
-        if a2 != 0:
-            x2_vals = (r.independiente - a1 * x1_vals) / a2
-            etiqueta = f"{a1}x1 + {a2}x2 {r.operador} {r.independiente}"
-            ax.plot(x1_vals, x2_vals, label=etiqueta)
+        limite = self.calcularLimite()
+        self.dibujarRestricciones(limite)
+        self.dibujarPuntoOptimo()
+
+        self.ax.set_xlim(0, limite)
+        self.ax.set_ylim(0, limite)
+        self.ax.set_xlabel("x1")
+        self.ax.set_ylabel("x2")
+        self.ax.legend()
+
+        if mostrar:
+            plt.show()
+
+        return self.figura
+
+    def dibujarRegionFactible(self):
+        if len(self.puntos) >= 3:
+            hull = ConvexHull(self.puntos)
+            orden = self.puntos[hull.vertices]
+            self.ax.fill(orden[:, 0], orden[:, 1], alpha=0.3, label="Región factible")
+
+    def calcularLimite(self):
+        if self.puntos.size > 0:
+            return self.puntos.max() * 1.2
         else:
-            x_constante = r.independiente / a1
-            ax.axvline(x_constante)
+            return 10
 
+    def dibujarRestricciones(self, limite):
+        x1_vals = np.linspace(0, limite, 200)
 
-def _dibujar_punto_optimo(ax, punto_optimo, z_optimo):
-    etiqueta = f"Óptimo Z={round(z_optimo, 2)}"
-    ax.scatter(punto_optimo[0], punto_optimo[1], color='red',
-               zorder=5, label=etiqueta)
+        for r in self.restricciones:
+            a1 = r.coeficientes[0]
+            a2 = r.coeficientes[1]
+
+            if a2 != 0:
+                x2_vals = (r.independiente - a1 * x1_vals) / a2
+                etiqueta = f"{a1}x1 + {a2}x2 {r.operador} {r.independiente}"
+                self.ax.plot(x1_vals, x2_vals, label=etiqueta)
+            else:
+                x_constante = r.independiente / a1
+                self.ax.axvline(x_constante)
+
+    def dibujarPuntoOptimo(self):
+        etiqueta = f"Óptimo Z={round(self.zOptimo, 2)}"
+        self.ax.scatter(self.puntoOptimo[0], self.puntoOptimo[1], color='red',
+                         zorder=5, label=etiqueta)
 
 
 import customtkinter as ctk
@@ -892,7 +903,6 @@ class interfaz(ctk.CTk):
             tabla.insert("", "end", values=filaZ, tags=("filaZ",))
 
             tabla.tag_configure("filaZ", background="#fff3cd")
-
 
 if __name__ == "__main__":
     app = interfaz()
