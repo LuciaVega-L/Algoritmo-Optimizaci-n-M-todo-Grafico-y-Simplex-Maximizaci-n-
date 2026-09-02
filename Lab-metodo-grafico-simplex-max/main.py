@@ -3,70 +3,76 @@ import numpy as np
 import re
 from collections import namedtuple
 
-def convertir_numero(numero):
-    numero = numero.replace(" ", "")
 
-    if numero in ("", "+"):
-        return 1
-
-    if numero == "-":
-        return -1
-
-    valor = float(numero)
-    return int(valor) if valor.is_integer() else valor
-
-
-coesFuncObj = []
-restricciones = []
 Restriccion = namedtuple('Restriccion', ['coeficientes', 'operador', 'independiente'])
 
 
-def extraerCoeficientesPorIndice(expresion, numVariables):
-    """
-    Busca cada término tipo '3x1', '-x2', etc., identifica el índice
-    de la variable (el número después de la x) y coloca su coeficiente
-    en la posición correspondiente. Las variables no mencionadas quedan en 0.
-    """
-    coeficientes = [0] * numVariables
+class Modelo:
 
-    terminos = re.findall(r'([+-]?\s*\d*\.?\d*)\s*x(\d+)', expresion)
+    def __init__(self):
+        self.coesFuncObj = []
+        self.restricciones = []
 
-    for coefTexto, indiceTexto in terminos:
-        indice = int(indiceTexto) - 1  # x1 -> índice 0, x2 -> índice 1, ...
+    def convertirNumero(self, numero):
+        numero = numero.replace(" ", "")
 
-        if indice < 0 or indice >= numVariables:
+        if numero in ("", "+"):
+            return 1
+
+        if numero == "-":
+            return -1
+
+        valor = float(numero)
+        return int(valor) if valor.is_integer() else valor
+
+    def extraerCoeficientesPorIndice(self, expresion, numVariables):
+        """
+        Busca cada término tipo '3x1', '-x2', etc., identifica el índice
+        de la variable (el número después de la x) y coloca su coeficiente
+        en la posición correspondiente. Las variables no mencionadas quedan en 0.
+        """
+        coeficientes = [0] * numVariables
+
+        terminos = re.findall(r'([+-]?\s*\d*\.?\d*)\s*x(\d+)', expresion)
+
+        for coefTexto, indiceTexto in terminos:
+            indice = int(indiceTexto) - 1  # x1 -> índice 0, x2 -> índice 1, ...
+
+            if indice < 0 or indice >= numVariables:
+                raise ValueError(
+                    f"La variable x{indice + 1} no existe: el modelo solo "
+                    f"tiene {numVariables} variables de decisión."
+                )
+
+            coeficientes[indice] = self.convertirNumero(coefTexto)
+
+        return coeficientes
+
+    def obtenerCoeficientesRestricciones(self, restriccion, numVariables):
+        coeficientes = self.extraerCoeficientesPorIndice(restriccion, numVariables)
+
+        resultado = re.search(
+            r'(<=|>=|=|<|>)\s*(-?\d+(?:\.\d+)?)',
+            restriccion
+        )
+        if resultado is None:
             raise ValueError(
-                f"La variable x{indice + 1} no existe: el modelo solo "
-                f"tiene {numVariables} variables de decisión."
+                "No se encontró un operador (<=, >=, =) con su término "
+                "independiente en la restricción."
             )
 
-        coeficientes[indice] = convertir_numero(coefTexto)
+        operador = resultado.group(1)
+        independiente = self.convertirNumero(resultado.group(2))
 
-    return coeficientes
+        self.restricciones.append(Restriccion(coeficientes, operador, independiente))
 
+    def obtenerCoeficientesFuncObj(self, funcObj, numVariables):
+        coeficientes = self.extraerCoeficientesPorIndice(funcObj, numVariables)
+        self.coesFuncObj.append(coeficientes)
 
-def obtenerCoeficientesRestricciones(restriccion, numVariables):
-    coeficientes = extraerCoeficientesPorIndice(restriccion, numVariables)
-
-    resultado = re.search(
-        r'(<=|>=|=|<|>)\s*(-?\d+(?:\.\d+)?)',
-        restriccion
-    )
-    if resultado is None:
-        raise ValueError(
-            "No se encontró un operador (<=, >=, =) con su término "
-            "independiente en la restricción."
-        )
-
-    operador = resultado.group(1)
-    independiente = convertir_numero(resultado.group(2))
-
-    restricciones.append(Restriccion(coeficientes, operador, independiente))
-
-
-def obtenerCoeficientesFuncObj(funcObj, numVariables):
-    coeficientes = extraerCoeficientesPorIndice(funcObj, numVariables)
-    coesFuncObj.append(coeficientes)
+    def limpiar(self):
+        self.coesFuncObj.clear()
+        self.restricciones.clear()
 
 
 # solver.py
@@ -527,6 +533,7 @@ class interfaz(ctk.CTk):
 
     def __init__(self):
         super().__init__()
+        self.modelo = Modelo()
 
         # Configuración de la Ventana Principal
         self.title("Laboratorio de Programación Lineal")
@@ -772,25 +779,24 @@ class interfaz(ctk.CTk):
 
 
     def resolverModelo(self):
-        coesFuncObj.clear()
-        restricciones.clear()
+        self.modelo.limpiar()
 
         try:
-            obtenerCoeficientesFuncObj(self.entradaFuncObj.get(), self.numVariables)
+            self.modelo.obtenerCoeficientesFuncObj(self.entradaFuncObj.get(), self.numVariables)
 
             for entrada in self.entradasRestricciones:
-                obtenerCoeficientesRestricciones(entrada.get(), self.numVariables)
+                self.modelo.obtenerCoeficientesRestricciones(entrada.get(), self.numVariables)
 
         except ValueError as error:
             messagebox.showerror("Error en los datos", str(error))
             return
 
-        coefObjetivo = coesFuncObj[0]
+        coefObjetivo = self.modelo.coesFuncObj[0]
 
         if self.metodoSeleccionado.get() == "grafico":
-            solver = MetodoGrafico(coefObjetivo, restricciones)
+            solver = MetodoGrafico(coefObjetivo, self.modelo.restricciones)
         else:
-            solver = MetodoSimplex(coefObjetivo, restricciones)
+            solver = MetodoSimplex(coefObjetivo, self.modelo.restricciones)
 
         salidaCapturada = io.StringIO()
         try:
