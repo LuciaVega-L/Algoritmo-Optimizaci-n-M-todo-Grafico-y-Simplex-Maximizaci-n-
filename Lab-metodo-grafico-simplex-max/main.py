@@ -26,11 +26,6 @@ class Modelo:
         return int(valor) if valor.is_integer() else valor
 
     def extraerCoeficientesPorIndice(self, expresion, numVariables):
-        """
-        Busca cada término tipo '3x1', '-x2', etc., identifica el índice
-        de la variable (el número después de la x) y coloca su coeficiente
-        en la posición correspondiente. Las variables no mencionadas quedan en 0.
-        """
         coeficientes = [0] * numVariables
 
         terminos = re.findall(r'([+-]?\s*\d*\.?\d*)\s*x(\d+)', expresion)
