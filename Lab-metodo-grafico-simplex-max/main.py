@@ -8,63 +8,60 @@ Restriccion = namedtuple('Restriccion', ['coeficientes', 'operador', 'independie
 
 
 class Modelo:
-
     def __init__(self):
         self.coesFuncObj = []
         self.restricciones = []
-
-    def convertirNumero(self, numero):
-        numero = numero.replace(" ", "")
-
-        if numero in ("", "+"):
-            return 1
-
-        if numero == "-":
-            return -1
-
-        valor = float(numero)
-        return int(valor) if valor.is_integer() else valor
-
-    def extraerCoeficientesPorIndice(self, expresion, numVariables):
-        coeficientes = [0] * numVariables
-
-        terminos = re.findall(r'([+-]?\s*\d*\.?\d*)\s*x(\d+)', expresion)
-
-        for coefTexto, indiceTexto in terminos:
-            indice = int(indiceTexto) - 1  # x1 -> índice 0, x2 -> índice 1, ...
-
-            if indice < 0 or indice >= numVariables:
-                raise ValueError(
-                    f"La variable x{indice + 1} no existe: el modelo solo "
-                    f"tiene {numVariables} variables de decisión."
-                )
-
-            coeficientes[indice] = self.convertirNumero(coefTexto)
-
-        return coeficientes
-
-    def obtenerCoeficientesRestricciones(self, restriccion, numVariables):
-        coeficientes = self.extraerCoeficientesPorIndice(restriccion, numVariables)
-
-        resultado = re.search(
-            r'(<=|>=|=|<|>)\s*(-?\d+(?:\.\d+)?)',
-            restriccion
-        )
-        if resultado is None:
+ 
+    def convertirValor(self, valor, nombreCampo):
+        """Convierte una entrada de texto (posiblemente vacía) a número."""
+        if valor is None:
+            valor = ""
+        valor = str(valor).strip()
+ 
+        if valor == "":
+            return 0
+ 
+        try:
+            numero = float(valor)
+        except ValueError:
             raise ValueError(
-                "No se encontró un operador (<=, >=, =) con su término "
-                "independiente en la restricción."
+                f"El valor '{valor}' ingresado en {nombreCampo} no es un número válido."
             )
-
-        operador = resultado.group(1)
-        independiente = self.convertirNumero(resultado.group(2))
-
-        self.restricciones.append(Restriccion(coeficientes, operador, independiente))
-
-    def obtenerCoeficientesFuncObj(self, funcObj, numVariables):
-        coeficientes = self.extraerCoeficientesPorIndice(funcObj, numVariables)
-        self.coesFuncObj.append(coeficientes)
-
+ 
+        return int(numero) if numero.is_integer() else numero
+ 
+    def validarCoeficientes(self, coeficientes, numVariables, contexto):
+        if len(coeficientes) != numVariables:
+            raise ValueError(
+                f"Se esperaban {numVariables} coeficientes para {contexto}, "
+                f"pero se recibieron {len(coeficientes)}."
+            )
+ 
+        validados = []
+        for i, valor in enumerate(coeficientes):
+            validados.append(self.convertirValor(valor, f"{contexto} (x{i + 1})"))
+ 
+        return validados
+ 
+    def agregarFuncionObjetivo(self, coeficientes, numVariables):
+        coefsValidados = self.validarCoeficientes(
+            coeficientes, numVariables, "la función objetivo"
+        )
+        self.coesFuncObj.append(coefsValidados)
+ 
+    def agregarRestriccion(self, coeficientes, operador, independiente, numVariables, numeroRestriccion):
+        contexto = f"la restricción {numeroRestriccion}"
+        coefsValidados = self.validarCoeficientes(coeficientes, numVariables, contexto)
+ 
+        if operador not in ("<=", ">=", "="):
+            raise ValueError(f"El operador seleccionado en {contexto} no es válido.")
+ 
+        independienteValidado = self.convertirValor(independiente, f"{contexto} (lado derecho)")
+ 
+        self.restricciones.append(
+            Restriccion(coefsValidados, operador, independienteValidado)
+        )
+ 
     def limpiar(self):
         self.coesFuncObj.clear()
         self.restricciones.clear()
@@ -537,123 +534,80 @@ ctk.set_default_color_theme("blue")
 
 class interfaz(ctk.CTk):
 
+ 
     def __init__(self):
         super().__init__()
         self.modelo = Modelo()
-
-        # Configuración de la Ventana Principal
+ 
         self.title("Laboratorio de Programación Lineal")
-        self.geometry("980x700")
-        self.minsize(850, 600)
-        self.configure(fg_color="#F4F6F9")  # Fondo claro pastel
-
-        self.entradasRestricciones = []
+        self.geometry("1000x700")
+        self.minsize(900, 600)
+        self.configure(fg_color="#F4F6F9")
+ 
         self.numVariables = 0
         self.numRestricciones = 0
         self.metodoSeleccionado = ctk.StringVar(value="grafico")
-
-        # Contenedor Tarjeta Principal (Efecto elevado)
-        self.card = ctk.CTkFrame(
-            self,
-            fg_color="#FFFFFF",
-            corner_radius=16,
-            border_width=1,
-            border_color="#E2E8F0"
-        )
+ 
+        # Referencias a los campos dinámicos de coeficientes
+        self.entradasFuncObj = []       # lista de CTkEntry, una por xi
+        self.filasRestricciones = []    # lista de dicts: {coeficientes, operador, independiente}
+ 
+        self.card = ctk.CTkFrame(self, fg_color="#FFFFFF", corner_radius=16,
+                                  border_width=1, border_color="#E2E8F0")
         self.card.pack(fill="both", expand=True, padx=25, pady=25)
-
-        # Contenedor interno desplazable para contenido dinámico
-        self.contenedor = ctk.CTkScrollableFrame(
-            self.card,
-            fg_color="transparent"
-        )
+ 
+        self.contenedor = ctk.CTkScrollableFrame(self.card, fg_color="transparent")
         self.contenedor.pack(fill="both", expand=True, padx=20, pady=20)
-
+ 
         self.construirFormularioInicial()
-
+ 
     def limpiarContenedor(self):
         for widget in self.contenedor.winfo_children():
             widget.destroy()
-
-
+ 
+    # ---------------------------------------------------------
+    # Paso 1: número de variables y restricciones (sin cambios)
+    # ---------------------------------------------------------
     def construirFormularioInicial(self):
         self.limpiarContenedor()
-
-        # Título y Subtítulo
-        lbl_titulo = ctk.CTkLabel(
-            self.contenedor,
-            text="Configuración del Modelo",
-            font=ctk.CTkFont(family="Segoe UI", size=22, weight="bold"),
-            text_color="#1E293B"
-        )
-        lbl_titulo.pack(anchor="w", pady=(10, 2))
-
-        lbl_subtitulo = ctk.CTkLabel(
-            self.contenedor,
-            text="Ingrese los parámetros generales para iniciar la optimización",
-            font=ctk.CTkFont(family="Segoe UI", size=13),
-            text_color="#64748B"
-        )
-        lbl_subtitulo.pack(anchor="w", pady=(0, 25))
-
-        # Panel de Formulario
-        form_frame = ctk.CTkFrame(
-            self.contenedor,
-            fg_color="#F8FAFC",
-            corner_radius=12,
-            border_width=1,
-            border_color="#F1F5F9"
-        )
+ 
+        ctk.CTkLabel(self.contenedor, text="Configuración del Modelo",
+                     font=ctk.CTkFont(family="Segoe UI", size=22, weight="bold"),
+                     text_color="#1E293B").pack(anchor="w", pady=(10, 2))
+ 
+        ctk.CTkLabel(self.contenedor,
+                     text="Ingrese los parámetros generales para iniciar la optimización",
+                     font=ctk.CTkFont(family="Segoe UI", size=13),
+                     text_color="#64748B").pack(anchor="w", pady=(0, 25))
+ 
+        form_frame = ctk.CTkFrame(self.contenedor, fg_color="#F8FAFC", corner_radius=12,
+                                   border_width=1, border_color="#F1F5F9")
         form_frame.pack(fill="x", pady=10, ipadx=10, ipady=10)
-
-        # Variables
-        ctk.CTkLabel(
-            form_frame,
-            text="Número de variables de decisión:",
-            font=ctk.CTkFont(size=14, weight="bold"),
-            text_color="#334155"
-        ).grid(row=0, column=0, sticky="w", padx=20, pady=15)
-
-        self.entradaNumVariables = ctk.CTkEntry(
-            form_frame,
-            placeholder_text="Ej: 2",
-            width=180,
-            height=38,
-            corner_radius=8
-        )
+ 
+        ctk.CTkLabel(form_frame, text="Número de variables de decisión:",
+                     font=ctk.CTkFont(size=14, weight="bold"),
+                     text_color="#334155").grid(row=0, column=0, sticky="w", padx=20, pady=15)
+ 
+        self.entradaNumVariables = ctk.CTkEntry(form_frame, placeholder_text="Ej: 2",
+                                                  width=180, height=38, corner_radius=8)
         self.entradaNumVariables.grid(row=0, column=1, padx=20, pady=15)
-
-        # Restricciones
-        ctk.CTkLabel(
-            form_frame,
-            text="Número de restricciones:",
-            font=ctk.CTkFont(size=14, weight="bold"),
-            text_color="#334155"
-        ).grid(row=1, column=0, sticky="w", padx=20, pady=15)
-
-        self.entradaNumRestricciones = ctk.CTkEntry(
-            form_frame,
-            placeholder_text="Ej: 3",
-            width=180,
-            height=38,
-            corner_radius=8
-        )
+ 
+        ctk.CTkLabel(form_frame, text="Número de restricciones:",
+                     font=ctk.CTkFont(size=14, weight="bold"),
+                     text_color="#334155").grid(row=1, column=0, sticky="w", padx=20, pady=15)
+ 
+        self.entradaNumRestricciones = ctk.CTkEntry(form_frame, placeholder_text="Ej: 3",
+                                                      width=180, height=38, corner_radius=8)
         self.entradaNumRestricciones.grid(row=1, column=1, padx=20, pady=15)
-
-        # Botón Continuar
-        btn_continuar = ctk.CTkButton(
-            self.contenedor,
-            text="Continuar →",
-            font=ctk.CTkFont(size=14, weight="bold"),
-            height=42,
-            corner_radius=8,
-            fg_color="#3B82F6",
-            hover_color="#2563EB",
-            command=self.generarCamposModelo
-        )
-        btn_continuar.pack(anchor="e", pady=25)
-
-
+ 
+        ctk.CTkButton(self.contenedor, text="Continuar →",
+                      font=ctk.CTkFont(size=14, weight="bold"), height=42, corner_radius=8,
+                      fg_color="#3B82F6", hover_color="#2563EB",
+                      command=self.generarCamposModelo).pack(anchor="e", pady=25)
+ 
+    # ---------------------------------------------------------
+    # Paso 2: campos de coeficientes individuales (CAMBIO CLAVE)
+    # ---------------------------------------------------------
     def generarCamposModelo(self):
         try:
             self.numVariables = int(self.entradaNumVariables.get())
@@ -661,149 +615,142 @@ class interfaz(ctk.CTk):
         except ValueError:
             messagebox.showerror("Error", "Ingrese números válidos.")
             return
-
+ 
         if self.numVariables <= 0 or self.numRestricciones <= 0:
             messagebox.showerror("Error", "Los valores deben ser mayores a 0.")
             return
-
+ 
         self.limpiarContenedor()
-        self.entradasRestricciones = []
-
-        # Encabezado
-        ctk.CTkLabel(
-            self.contenedor,
-            text="Definición de Ecuaciones",
-            font=ctk.CTkFont(family="Segoe UI", size=22, weight="bold"),
-            text_color="#1E293B"
-        ).pack(anchor="w", pady=(10, 2))
-
-        ctk.CTkLabel(
-            self.contenedor,
-            text="Formato aceptado: 2x1+3x2<=10  (operadores: <=, >=, =)",
-            font=ctk.CTkFont(size=13),
-            text_color="#64748B"
-        ).pack(anchor="w", pady=(0, 20))
-
-        # Sección Función Objetivo
+        self.entradasFuncObj = []
+        self.filasRestricciones = []
+ 
+        ctk.CTkLabel(self.contenedor, text="Definición de Ecuaciones",
+                     font=ctk.CTkFont(family="Segoe UI", size=22, weight="bold"),
+                     text_color="#1E293B").pack(anchor="w", pady=(10, 2))
+ 
+        ctk.CTkLabel(self.contenedor,
+                     text="Ingrese el coeficiente de cada variable (deje vacío = 0)",
+                     font=ctk.CTkFont(size=13), text_color="#64748B").pack(anchor="w", pady=(0, 20))
+ 
+        # ---- Función objetivo ----
         obj_frame = ctk.CTkFrame(self.contenedor, fg_color="#F8FAFC", corner_radius=10)
-        obj_frame.pack(fill="x", pady=10, ipady=5)
-
-        ctk.CTkLabel(
-            obj_frame,
-            text="Función objetivo:",
-            font=ctk.CTkFont(size=14, weight="bold"),
-            text_color="#334155"
-        ).grid(row=0, column=0, sticky="w", padx=15, pady=12)
-
-        self.entradaFuncObj = ctk.CTkEntry(
-            obj_frame,
-            width=400,
-            height=36,
-            placeholder_text="Ej: 3x1 + 5x2",
-            corner_radius=8
-        )
-        self.entradaFuncObj.grid(row=0, column=1, padx=15, pady=12)
-
-        # Sección Restricciones
+        obj_frame.pack(fill="x", pady=10, ipady=10, padx=2)
+ 
+        ctk.CTkLabel(obj_frame, text="Función objetivo: Z =",
+                     font=ctk.CTkFont(size=14, weight="bold"),
+                     text_color="#334155").grid(row=0, column=0, sticky="w", padx=15, pady=12)
+ 
+        self._construirFilaCoeficientes(obj_frame, fila=0, columnaInicial=1,
+                                         listaDestino=self.entradasFuncObj)
+ 
+        # ---- Restricciones ----
         rest_frame = ctk.CTkFrame(self.contenedor, fg_color="#F8FAFC", corner_radius=10)
-        rest_frame.pack(fill="x", pady=10, ipady=5)
-
+        rest_frame.pack(fill="x", pady=10, ipady=10, padx=2)
+ 
         for i in range(self.numRestricciones):
-            ctk.CTkLabel(
-                rest_frame,
-                text=f"Restricción {i + 1}:",
-                font=ctk.CTkFont(size=13, weight="bold"),
-                text_color="#475569"
-            ).grid(row=i, column=0, sticky="w", padx=15, pady=8)
-
-            entrada = ctk.CTkEntry(
-                rest_frame,
-                width=400,
-                height=36,
-                placeholder_text=f"Ej: 2x1 + x2 <= 10",
-                corner_radius=8
+            ctk.CTkLabel(rest_frame, text=f"Restricción {i + 1}:",
+                         font=ctk.CTkFont(size=13, weight="bold"),
+                         text_color="#475569").grid(row=i, column=0, sticky="w", padx=15, pady=8)
+ 
+            coeficientesEntradas = []
+            columna = self._construirFilaCoeficientes(
+                rest_frame, fila=i, columnaInicial=1, listaDestino=coeficientesEntradas
             )
-            entrada.grid(row=i, column=1, padx=15, pady=8)
-            self.entradasRestricciones.append(entrada)
-
-        # Selección de Método
+ 
+            operador = ctk.CTkComboBox(rest_frame, values=["<=", ">=", "="],
+                                        width=70, state="readonly")
+            operador.set("<=")
+            operador.grid(row=i, column=columna, padx=(15, 5), pady=8)
+            columna += 1
+ 
+            independiente = ctk.CTkEntry(rest_frame, width=80, placeholder_text="0",
+                                          corner_radius=8)
+            independiente.grid(row=i, column=columna, padx=(5, 15), pady=8)
+ 
+            self.filasRestricciones.append({
+                "coeficientes": coeficientesEntradas,
+                "operador": operador,
+                "independiente": independiente,
+            })
+ 
+        # ---- Método de solución ----
         metodo_frame = ctk.CTkFrame(self.contenedor, fg_color="#F8FAFC", corner_radius=10)
         metodo_frame.pack(fill="x", pady=10, ipady=5)
-
-        ctk.CTkLabel(
-            metodo_frame,
-            text="Método de solución:",
-            font=ctk.CTkFont(size=14, weight="bold"),
-            text_color="#334155"
-        ).grid(row=0, column=0, sticky="w", padx=15, pady=12)
-
-        radio_grafico = ctk.CTkRadioButton(
-            metodo_frame,
-            text="Gráfico",
-            value="grafico",
-            variable=self.metodoSeleccionado,
-            font=ctk.CTkFont(size=13)
-        )
-        radio_grafico.grid(row=0, column=1, padx=15, pady=12)
-
-        radio_simplex = ctk.CTkRadioButton(
-            metodo_frame,
-            text="Simplex",
-            value="simplex",
-            variable=self.metodoSeleccionado,
-            font=ctk.CTkFont(size=13)
-        )
-        radio_simplex.grid(row=0, column=2, padx=15, pady=12)
-
-        # Botones de Acción
+ 
+        ctk.CTkLabel(metodo_frame, text="Método de solución:",
+                     font=ctk.CTkFont(size=14, weight="bold"),
+                     text_color="#334155").grid(row=0, column=0, sticky="w", padx=15, pady=12)
+ 
+        ctk.CTkRadioButton(metodo_frame, text="Gráfico", value="grafico",
+                           variable=self.metodoSeleccionado,
+                           font=ctk.CTkFont(size=13)).grid(row=0, column=1, padx=15, pady=12)
+ 
+        ctk.CTkRadioButton(metodo_frame, text="Simplex", value="simplex",
+                           variable=self.metodoSeleccionado,
+                           font=ctk.CTkFont(size=13)).grid(row=0, column=2, padx=15, pady=12)
+ 
+        # ---- Botones ----
         btn_box = ctk.CTkFrame(self.contenedor, fg_color="transparent")
         btn_box.pack(fill="x", pady=20)
-
-        btn_volver = ctk.CTkButton(
-            btn_box,
-            text="← Volver",
-            fg_color="#E2E8F0",
-            hover_color="#CBD5E1",
-            text_color="#334155",
-            height=40,
-            corner_radius=8,
-            command=self.construirFormularioInicial
-        )
-        btn_volver.pack(side="left")
-
-        btn_resolver = ctk.CTkButton(
-            btn_box,
-            text="Resolver Modelo",
-            font=ctk.CTkFont(size=14, weight="bold"),
-            fg_color="#10B981",
-            hover_color="#059669",
-            height=40,
-            corner_radius=8,
-            command=self.resolverModelo
-        )
-        btn_resolver.pack(side="right")
-
-
+ 
+        ctk.CTkButton(btn_box, text="← Volver", fg_color="#E2E8F0", hover_color="#CBD5E1",
+                     text_color="#334155", height=40, corner_radius=8,
+                     command=self.construirFormularioInicial).pack(side="left")
+ 
+        ctk.CTkButton(btn_box, text="Resolver Modelo",
+                     font=ctk.CTkFont(size=14, weight="bold"), fg_color="#10B981",
+                     hover_color="#059669", height=40, corner_radius=8,
+                     command=self.resolverModelo).pack(side="right")
+ 
+    def _construirFilaCoeficientes(self, contenedorPadre, fila, columnaInicial, listaDestino):
+        """Crea 'numVariables' entradas (una por xi) + etiquetas '+', en la fila dada.
+        Devuelve la siguiente columna libre para seguir agregando widgets (operador, RHS)."""
+        columna = columnaInicial
+ 
+        for j in range(self.numVariables):
+            entrada = ctk.CTkEntry(contenedorPadre, width=55, height=32,
+                                    placeholder_text="0", corner_radius=6)
+            entrada.grid(row=fila, column=columna, padx=(10, 2), pady=8)
+            listaDestino.append(entrada)
+            columna += 1
+ 
+            textoEtiqueta = f"x{j + 1}" + ("  +" if j < self.numVariables - 1 else "")
+            ctk.CTkLabel(contenedorPadre, text=textoEtiqueta,
+                        font=ctk.CTkFont(size=13)).grid(row=fila, column=columna, padx=(0, 8))
+            columna += 1
+ 
+        return columna
+ 
+    # ---------------------------------------------------------
+    # Paso 3: resolver (ahora sin parseo de texto libre)
+    # ---------------------------------------------------------
     def resolverModelo(self):
         self.modelo.limpiar()
-
+ 
         try:
-            self.modelo.obtenerCoeficientesFuncObj(self.entradaFuncObj.get(), self.numVariables)
-
-            for entrada in self.entradasRestricciones:
-                self.modelo.obtenerCoeficientesRestricciones(entrada.get(), self.numVariables)
-
+            coefsObjetivo = [entrada.get() for entrada in self.entradasFuncObj]
+            self.modelo.agregarFuncionObjetivo(coefsObjetivo, self.numVariables)
+ 
+            for i, fila in enumerate(self.filasRestricciones, start=1):
+                coeficientes = [entrada.get() for entrada in fila["coeficientes"]]
+                operador = fila["operador"].get()
+                independiente = fila["independiente"].get()
+ 
+                self.modelo.agregarRestriccion(
+                    coeficientes, operador, independiente, self.numVariables, i
+                )
+ 
         except ValueError as error:
             messagebox.showerror("Error en los datos", str(error))
             return
-
+ 
         coefObjetivo = self.modelo.coesFuncObj[0]
-
+ 
         if self.metodoSeleccionado.get() == "grafico":
             solver = MetodoGrafico(coefObjetivo, self.modelo.restricciones)
         else:
             solver = MetodoSimplex(coefObjetivo, self.modelo.restricciones)
-
+ 
         salidaCapturada = io.StringIO()
         try:
             with contextlib.redirect_stdout(salidaCapturada):
@@ -811,7 +758,8 @@ class interfaz(ctk.CTk):
         except ValueError as error:
             messagebox.showerror("No se pudo resolver", str(error))
             return
-
+ 
+        self.mostrarResultado(solver, puntoOptimo, zOptimo)
         self.mostrarResultado(solver, puntoOptimo, zOptimo)
 
     def mostrarResultado(self, solver, puntoOptimo, zOptimo):
