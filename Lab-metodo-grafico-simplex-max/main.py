@@ -760,8 +760,7 @@ class interfaz(ctk.CTk):
             return
  
         self.mostrarResultado(solver, puntoOptimo, zOptimo)
-        self.mostrarResultado(solver, puntoOptimo, zOptimo)
-
+        
     def mostrarResultado(self, solver, puntoOptimo, zOptimo):
         self.limpiarContenedor()
 
