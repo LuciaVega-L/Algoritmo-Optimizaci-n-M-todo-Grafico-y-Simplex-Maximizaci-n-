@@ -297,7 +297,7 @@ class MetodoSimplex(Solver):
         self.variablesBasicas = variablesBasicas
         self.totalColumnas = totalColumnas
 
-        # Nombres legibles de cada columna: x1, x2, ..., s1, s2, ...
+        # Nombres legibles de cada columna
         self.nombresColumnas = []
         for j in range(self.numVariables):
             self.nombresColumnas.append(f"x{j + 1}")
@@ -353,7 +353,6 @@ class MetodoSimplex(Solver):
                     columnaElegida = j
 
         return columnaElegida
-
 
     def optimizar(self):
         iteracion = 0
@@ -440,7 +439,6 @@ class MetodoSimplex(Solver):
 
         self.variablesBasicas[filaPivote] = columnaPivote
 
- 
     def extraerSolucion(self):
         valores = np.zeros(self.totalColumnas)
 
@@ -481,12 +479,6 @@ class MetodoSimplex(Solver):
 import numpy as np
 from scipy.spatial import ConvexHull
 import matplotlib.pyplot as plt
-
-# graficador.py
-import numpy as np
-from scipy.spatial import ConvexHull
-import matplotlib.pyplot as plt
-
 
 class Graficador:
 
@@ -556,7 +548,6 @@ from tkinter import messagebox
 import contextlib
 import io
 from tkinter import ttk
-
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
 
 ctk.set_appearance_mode("Light")
@@ -579,9 +570,8 @@ class interfaz(ctk.CTk):
         self.numRestricciones = 0
         self.metodoSeleccionado = ctk.StringVar(value="grafico")
  
-        # Referencias a los campos dinámicos de coeficientes
-        self.entradasFuncObj = []       # lista de CTkEntry, una por xi
-        self.filasRestricciones = []    # lista de dicts: {coeficientes, operador, independiente}
+        self.entradasFuncObj = []       
+        self.filasRestricciones = []    
  
         self.card = ctk.CTkFrame(self, fg_color="#FFFFFF", corner_radius=16,
                                   border_width=1, border_color="#E2E8F0")
@@ -596,9 +586,6 @@ class interfaz(ctk.CTk):
         for widget in self.contenedor.winfo_children():
             widget.destroy()
  
-    # ---------------------------------------------------------
-    # Paso 1: número de variables y restricciones (sin cambios)
-    # ---------------------------------------------------------
     def construirFormularioInicial(self):
         self.limpiarContenedor()
  
@@ -636,9 +623,6 @@ class interfaz(ctk.CTk):
                       fg_color="#3B82F6", hover_color="#2563EB",
                       command=self.generarCamposModelo).pack(anchor="e", pady=25)
  
-    # ---------------------------------------------------------
-    # Paso 2: campos de coeficientes individuales (CAMBIO CLAVE)
-    # ---------------------------------------------------------
     def generarCamposModelo(self):
         try:
             self.numVariables = int(self.entradaNumVariables.get())
@@ -663,7 +647,7 @@ class interfaz(ctk.CTk):
                      text="Ingrese el coeficiente de cada variable (deje vacío = 0)",
                      font=ctk.CTkFont(size=13), text_color="#64748B").pack(anchor="w", pady=(0, 20))
  
-        # ---- Función objetivo ----
+        #  Función objetivo 
         obj_frame = ctk.CTkFrame(self.contenedor, fg_color="#F8FAFC", corner_radius=10)
         obj_frame.pack(fill="x", pady=10, ipady=10, padx=2)
  
@@ -674,7 +658,7 @@ class interfaz(ctk.CTk):
         self._construirFilaCoeficientes(obj_frame, fila=0, columnaInicial=1,
                                          listaDestino=self.entradasFuncObj)
  
-        # ---- Restricciones ----
+        # Restricciones 
         rest_frame = ctk.CTkFrame(self.contenedor, fg_color="#F8FAFC", corner_radius=10)
         rest_frame.pack(fill="x", pady=10, ipady=10, padx=2)
  
@@ -704,7 +688,7 @@ class interfaz(ctk.CTk):
                 "independiente": independiente,
             })
  
-        # ---- Método de solución ----
+        # Método de solución 
         metodo_frame = ctk.CTkFrame(self.contenedor, fg_color="#F8FAFC", corner_radius=10)
         metodo_frame.pack(fill="x", pady=10, ipady=5)
  
@@ -752,9 +736,6 @@ class interfaz(ctk.CTk):
  
         return columna
  
-    # ---------------------------------------------------------
-    # Paso 3: resolver (ahora sin parseo de texto libre)
-    # ---------------------------------------------------------
     def resolverModelo(self):
         self.modelo.limpiar()
  
