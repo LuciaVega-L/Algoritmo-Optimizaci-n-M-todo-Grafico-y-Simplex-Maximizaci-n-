@@ -80,6 +80,9 @@ class Solver(ABC):
         pass
 
 class MetodoGrafico(Solver):
+ 
+    TOL = 1e-9
+
     def resolver(self):
         print("resolviendo el modelo utilizando el método gráfico...")
 
@@ -91,12 +94,40 @@ class MetodoGrafico(Solver):
         vertices = self.filtrarFactibles(intersecciones)
         if len(vertices) == 0:
             raise ValueError("No se encontró una región factible.")
+
+        if self.esNoAcotado(vertices):
+            raise ValueError(
+                "El problema no tiene solución óptima: la región factible es "
+                "no acotada, Z crece indefinidamente"
+            )
+
         puntoOptimo, zOptimo = self.evaluarObjetivo(vertices)
 
         graficador = Graficador(self.restricciones, vertices, puntoOptimo, zOptimo)
         self.figura = graficador.graficar(mostrar=False)
 
         return puntoOptimo, zOptimo
+
+    def esNoAcotado(self, vertices):
+        c1 = self.coefObjetivo[0]
+        c2 = self.coefObjetivo[1]
+
+        direccion = np.array([c1, c2], dtype=float)
+        norma = np.linalg.norm(direccion)
+
+        if norma < self.TOL:
+            return False  # Z es constante, no puede crecer a infinito
+
+        direccionUnitaria = direccion / norma
+
+        for vertice in vertices:
+            puntoLejano1 = np.array(vertice) + direccionUnitaria * 1e6
+            puntoLejano2 = np.array(vertice) + direccionUnitaria * 1e9
+
+            if self.esFactible(puntoLejano1) and self.esFactible(puntoLejano2):
+                return True
+
+        return False
 
     def construirLineas(self):
         lineas = [(r.coeficientes[0], r.coeficientes[1], r.independiente)
