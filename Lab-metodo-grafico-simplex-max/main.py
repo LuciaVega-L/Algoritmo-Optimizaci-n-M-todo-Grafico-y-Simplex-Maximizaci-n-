@@ -73,9 +73,6 @@ class Solver(ABC):
     def __init__(self, coefObjetivo, restricciones, tipo='max'):
         self.coefObjetivo = coefObjetivo
         self.restricciones = restricciones
-        # tipo: 'max' para maximizar, 'min' para minimizar.
-        # Por defecto se mantiene 'max' para no afectar a solvers
-        # que aún no soportan minimización (por ejemplo, el simplex).
         self.tipo = tipo
 
     @abstractmethod
@@ -124,8 +121,6 @@ class MetodoGrafico(Solver):
 
         direccion = np.array([c1, c2], dtype=float)
 
-        # Si estamos minimizando, el crecimiento no acotado ocurre en la
-        # dirección contraria al gradiente (Z decrece indefinidamente).
         if self.tipo == 'min':
             direccion = -direccion
 
