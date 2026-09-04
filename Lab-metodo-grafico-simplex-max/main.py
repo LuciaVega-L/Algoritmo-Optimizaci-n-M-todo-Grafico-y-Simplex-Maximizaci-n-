@@ -13,7 +13,6 @@ class Modelo:
         self.restricciones = []
  
     def convertirValor(self, valor, nombreCampo):
-        """Convierte una entrada de texto (posiblemente vacía) a número."""
         if valor is None:
             valor = ""
         valor = str(valor).strip()
@@ -116,7 +115,7 @@ class MetodoGrafico(Solver):
         norma = np.linalg.norm(direccion)
 
         if norma < self.TOL:
-            return False  # Z es constante, no puede crecer a infinito
+            return False  
 
         direccionUnitaria = direccion / norma
 
@@ -140,7 +139,6 @@ class MetodoGrafico(Solver):
         return lineas
     
     def hallarIntersecciones(self, lineas):
-        """Resuelve el sistema 2x2 para cada par de líneas."""
         puntos = []
         for (x1, x2, c1), (x3, x4, c2) in combinations(lineas, 2):
             A = np.array([[x1, x2], [x3, x4]], dtype=float)
@@ -181,7 +179,6 @@ class MetodoGrafico(Solver):
                 if diferencia > tol:
                     return False
 
-        # Si pasó todas las pruebas, es factible
         return True
 
     def yaExiste(self, punto, lista_puntos, tol=1e-6):
@@ -718,8 +715,6 @@ class interfaz(ctk.CTk):
                      command=self.resolverModelo).pack(side="right")
  
     def _construirFilaCoeficientes(self, contenedorPadre, fila, columnaInicial, listaDestino):
-        """Crea 'numVariables' entradas (una por xi) + etiquetas '+', en la fila dada.
-        Devuelve la siguiente columna libre para seguir agregando widgets (operador, RHS)."""
         columna = columnaInicial
  
         for j in range(self.numVariables):
