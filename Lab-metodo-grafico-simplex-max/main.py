@@ -248,12 +248,6 @@ import numpy as np
 
 
 class MetodoSimplex(Solver):
-    # NOTA: por ahora el simplex clásico implementado aquí solo maximiza.
-    # Si se desea minimizar con simplex, la forma estándar es convertir
-    # el problema a max(-Z) y luego negar el resultado, pero eso no se
-    # implementa en esta versión porque el pedido es solo para el método
-    # gráfico.
-
     TOL = 1e-9
 
     def resolver(self):
