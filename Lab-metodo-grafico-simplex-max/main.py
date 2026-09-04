@@ -70,9 +70,13 @@ class Modelo:
 from abc import ABC, abstractmethod
 
 class Solver(ABC):
-    def __init__(self, coefObjetivo, restricciones):
+    def __init__(self, coefObjetivo, restricciones, tipo='max'):
         self.coefObjetivo = coefObjetivo
         self.restricciones = restricciones
+        # tipo: 'max' para maximizar, 'min' para minimizar.
+        # Por defecto se mantiene 'max' para no afectar a solvers
+        # que aún no soportan minimización (por ejemplo, el simplex).
+        self.tipo = tipo
 
     @abstractmethod
     def resolver(self):
@@ -83,7 +87,7 @@ class MetodoGrafico(Solver):
     TOL = 1e-9
 
     def resolver(self):
-        print("resolviendo el modelo utilizando el método gráfico...")
+        print(f"resolviendo el modelo utilizando el método gráfico ({self.tipo})...")
 
         if len(self.coefObjetivo) != 2:
             raise ValueError("El método gráfico solo es aplicable a problemas con dos variables de decisión.")
@@ -95,10 +99,17 @@ class MetodoGrafico(Solver):
             raise ValueError("No se encontró una región factible.")
 
         if self.esNoAcotado(vertices):
-            raise ValueError(
-                "El problema no tiene solución óptima: la región factible es "
-                "no acotada, Z crece indefinidamente"
-            )
+            if self.tipo == 'min':
+                mensaje = (
+                    "El problema no tiene solución óptima: la región factible es "
+                    "no acotada, Z decrece indefinidamente"
+                )
+            else:
+                mensaje = (
+                    "El problema no tiene solución óptima: la región factible es "
+                    "no acotada, Z crece indefinidamente"
+                )
+            raise ValueError(mensaje)
 
         puntoOptimo, zOptimo = self.evaluarObjetivo(vertices)
 
@@ -112,6 +123,12 @@ class MetodoGrafico(Solver):
         c2 = self.coefObjetivo[1]
 
         direccion = np.array([c1, c2], dtype=float)
+
+        # Si estamos minimizando, el crecimiento no acotado ocurre en la
+        # dirección contraria al gradiente (Z decrece indefinidamente).
+        if self.tipo == 'min':
+            direccion = -direccion
+
         norma = np.linalg.norm(direccion)
 
         if norma < self.TOL:
@@ -213,9 +230,14 @@ class MetodoGrafico(Solver):
         mejorZ = valoresZ[0]
 
         for i in range(1, len(valoresZ)):
-            if valoresZ[i] > mejorZ:
-                mejorZ = valoresZ[i]
-                mejorIndice = i
+            if self.tipo == 'min':
+                if valoresZ[i] < mejorZ:
+                    mejorZ = valoresZ[i]
+                    mejorIndice = i
+            else:
+                if valoresZ[i] > mejorZ:
+                    mejorZ = valoresZ[i]
+                    mejorIndice = i
 
         puntoOptimo = vertices[mejorIndice]
         zOptimo = mejorZ
@@ -226,6 +248,11 @@ import numpy as np
 
 
 class MetodoSimplex(Solver):
+    # NOTA: por ahora el simplex clásico implementado aquí solo maximiza.
+    # Si se desea minimizar con simplex, la forma estándar es convertir
+    # el problema a max(-Z) y luego negar el resultado, pero eso no se
+    # implementa en esta versión porque el pedido es solo para el método
+    # gráfico.
 
     TOL = 1e-9
 
@@ -566,6 +593,8 @@ class interfaz(ctk.CTk):
         self.numVariables = 0
         self.numRestricciones = 0
         self.metodoSeleccionado = ctk.StringVar(value="grafico")
+        # Tipo de objetivo: solo se usa cuando el método seleccionado es "grafico"
+        self.tipoObjetivo = ctk.StringVar(value="max")
  
         self.entradasFuncObj = []       
         self.filasRestricciones = []    
@@ -700,6 +729,19 @@ class interfaz(ctk.CTk):
         ctk.CTkRadioButton(metodo_frame, text="Simplex", value="simplex",
                            variable=self.metodoSeleccionado,
                            font=ctk.CTkFont(size=13)).grid(row=0, column=2, padx=15, pady=12)
+
+        # Tipo de objetivo (solo aplica al método gráfico)
+        ctk.CTkLabel(metodo_frame, text="Tipo de objetivo (solo gráfico):",
+                     font=ctk.CTkFont(size=14, weight="bold"),
+                     text_color="#334155").grid(row=1, column=0, sticky="w", padx=15, pady=12)
+
+        ctk.CTkRadioButton(metodo_frame, text="Maximizar", value="max",
+                           variable=self.tipoObjetivo,
+                           font=ctk.CTkFont(size=13)).grid(row=1, column=1, padx=15, pady=12)
+
+        ctk.CTkRadioButton(metodo_frame, text="Minimizar", value="min",
+                           variable=self.tipoObjetivo,
+                           font=ctk.CTkFont(size=13)).grid(row=1, column=2, padx=15, pady=12)
  
         # ---- Botones ----
         btn_box = ctk.CTkFrame(self.contenedor, fg_color="transparent")
@@ -754,8 +796,15 @@ class interfaz(ctk.CTk):
         coefObjetivo = self.modelo.coesFuncObj[0]
  
         if self.metodoSeleccionado.get() == "grafico":
-            solver = MetodoGrafico(coefObjetivo, self.modelo.restricciones)
+            solver = MetodoGrafico(coefObjetivo, self.modelo.restricciones,
+                                    tipo=self.tipoObjetivo.get())
         else:
+            # El simplex clásico implementado aquí solo maximiza.
+            if self.tipoObjetivo.get() == "min":
+                messagebox.showerror(
+                    "Minimización no disponible en Simplex"
+                )
+                return
             solver = MetodoSimplex(coefObjetivo, self.modelo.restricciones)
  
         salidaCapturada = io.StringIO()
@@ -789,6 +838,15 @@ class interfaz(ctk.CTk):
         resumen_box.pack(fill="x", pady=(0, 20), ipady=10, ipadx=10)
 
         vars_str = ",  ".join([f"x{i+1} = {round(val, 4)}" for i, val in enumerate(puntoOptimo)])
+
+        tipoTexto = "Maximizar" if getattr(solver, "tipo", "max") == "max" else "Minimizar"
+
+        ctk.CTkLabel(
+            resumen_box,
+            text=f"Tipo de objetivo: {tipoTexto}",
+            font=ctk.CTkFont(size=12),
+            text_color="#1E40AF"
+        ).pack(anchor="w", padx=15, pady=(6, 0))
 
         ctk.CTkLabel(
             resumen_box,
@@ -861,5 +919,3 @@ class interfaz(ctk.CTk):
 if __name__ == "__main__":
     app = interfaz()
     app.mainloop()
-
-    
