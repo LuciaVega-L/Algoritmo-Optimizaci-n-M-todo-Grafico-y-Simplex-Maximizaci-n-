@@ -281,13 +281,13 @@ class MetodoSimplex(Solver):
             coeficientes, operador, independiente = restriccionesNormalizadas[i]
 
             for j in range(self.numVariables):
-                tabla[i][j] = coeficientes[j]
+                tabla[i][j] = coeficientes[j] #restricciones 
 
             columnaHolgura = self.numVariables + i
             tabla[i][columnaHolgura] = 1
             variablesBasicas.append(columnaHolgura)
 
-            tabla[i][totalColumnas] = independiente
+            tabla[i][totalColumnas] = independiente #RHS
 
         self.tabla = tabla
         self.costos = costos
