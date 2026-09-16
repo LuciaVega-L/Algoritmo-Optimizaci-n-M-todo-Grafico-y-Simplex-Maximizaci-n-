@@ -488,6 +488,188 @@ class MetodoSimplex(Solver):
         print("Cj - Zj:", np.round(cjMenosZj, 3))
         print("Z actual:", round(z, 3))
 
+
+class MetodoSimplexGranM(MetodoSimplex):
+    """
+    Resuelve problemas de MINIMIZACIÓN con el método simplex usando la
+    técnica de la Gran M (variables artificiales penalizadas con un
+    valor M muy grande en la función objetivo).
+
+    Reutiliza de MetodoSimplex todo lo que no depende del sentido de
+    optimización (cálculo de costos reducidos, pivoteo, prueba de razón
+    mínima y registro de iteraciones) y solo redefine:
+        - construirTableauInicial: agrega holgura/superávit/artificiales
+          según el operador de cada restricción (<=, >=, =).
+        - elegirColumnaPivote: entra la variable con el Cj-Zj MÁS NEGATIVO
+          (en minimización, ese es el criterio de mejora).
+        - esOptimo: es óptimo cuando ya no quedan Cj-Zj negativos.
+        - verificarFactibilidad: si al final queda una variable artificial
+          básica con valor positivo, el problema no tiene solución factible.
+    """
+
+    # Valor grande usado para penalizar las variables artificiales.
+    # Se usa como número (no simbólico), igual a como se verificó a mano
+    # reemplazando M por 1.000.000 para comparar los Cj - Zj.
+    M = 1_000_000
+
+    def resolver(self):
+        print("resolviendo el modelo utilizando el método simplex (Gran M)...")
+
+        self.numVariables = len(self.coefObjetivo)
+        self.construirTableauInicial()
+
+        self.optimizarGranM()
+        self.verificarFactibilidad()
+
+        puntoOptimo, zOptimo = self.extraerSolucion()
+
+        return puntoOptimo, zOptimo
+
+    def normalizarSignos(self, restricciones):
+        # Si el lado derecho es negativo, se multiplica la fila por -1
+        # (y se invierte el operador <= / >=) para que el RHS sea >= 0.
+        normalizadas = []
+
+        for r in restricciones:
+            coeficientes = list(r.coeficientes)
+            operador = r.operador
+            independiente = r.independiente
+
+            if independiente < 0:
+                coeficientes = [-c for c in coeficientes]
+                independiente = -independiente
+                if operador == '<=':
+                    operador = '>='
+                elif operador == '>=':
+                    operador = '<='
+                # '=' se mantiene igual
+
+            normalizadas.append((coeficientes, operador, independiente))
+
+        return normalizadas
+
+    def construirTableauInicial(self):
+        restriccionesProc = self.normalizarSignos(self.restricciones)
+        numRestricciones = len(restriccionesProc)
+
+        # Se define, en el mismo orden que las restricciones, qué columnas
+        # extra necesita cada una: holgura (<=), superávit + artificial (>=)
+        # o solo artificial (=). Esto reproduce el orden x1,x2,s1,A1,s2,A2...
+        # que se ve en el tablero hecho a mano.
+        columnasExtra = []  # (tipo, fila, coeficiente, costo)
+        for i, (coeficientes, operador, independiente) in enumerate(restriccionesProc):
+            if operador == '<=':
+                columnasExtra.append(('slack', i, 1, 0))
+            elif operador == '>=':
+                columnasExtra.append(('surplus', i, -1, 0))
+                columnasExtra.append(('artificial', i, 1, self.M))
+            else:  # '='
+                columnasExtra.append(('artificial', i, 1, self.M))
+
+        totalColumnas = self.numVariables + len(columnasExtra)
+
+        tabla = np.zeros((numRestricciones, totalColumnas + 1))
+        costos = np.zeros(totalColumnas)
+        variablesBasicas = [None] * numRestricciones
+        nombresColumnas = [f"x{j + 1}" for j in range(self.numVariables)]
+
+        for j in range(self.numVariables):
+            costos[j] = self.coefObjetivo[j]
+
+        for i, (coeficientes, operador, independiente) in enumerate(restriccionesProc):
+            for j in range(self.numVariables):
+                tabla[i][j] = coeficientes[j]
+            tabla[i][totalColumnas] = independiente
+
+        contadorSlack = 0
+        contadorArtificial = 0
+        indicesArtificiales = []
+
+        for k, (tipo, fila, coeficiente, costo) in enumerate(columnasExtra):
+            col = self.numVariables + k
+            tabla[fila][col] = coeficiente
+            costos[col] = costo
+
+            if tipo == 'slack':
+                contadorSlack += 1
+                nombresColumnas.append(f"s{contadorSlack}")
+                variablesBasicas[fila] = col
+
+            elif tipo == 'surplus':
+                contadorSlack += 1
+                nombresColumnas.append(f"s{contadorSlack}")
+                # el superávit no puede ser variable básica inicial
+                # (queda con coeficiente -1), la básica de esa fila
+                # será la artificial que se agrega justo después
+
+            else:  # 'artificial'
+                contadorArtificial += 1
+                nombresColumnas.append(f"A{contadorArtificial}")
+                variablesBasicas[fila] = col
+                indicesArtificiales.append(col)
+
+        self.tabla = tabla
+        self.costos = costos
+        self.variablesBasicas = variablesBasicas
+        self.totalColumnas = totalColumnas
+        self.nombresColumnas = nombresColumnas
+        self.indicesArtificiales = indicesArtificiales
+        self.historial = []
+
+    def optimizarGranM(self):
+        iteracion = 0
+
+        while True:
+            cjMenosZj, z = self.calcularCostosReducidos()
+            self.registrarIteracion("Gran M", iteracion, cjMenosZj, z)
+
+            if self.esOptimo(cjMenosZj):
+                break
+
+            columnaPivote = self.elegirColumnaPivote(cjMenosZj)
+            filaPivote = self.elegirFilaPivote(columnaPivote)
+
+            if filaPivote is None:
+                raise ValueError("El problema no tiene solución acotada.")
+
+            self.pivotear(filaPivote, columnaPivote)
+            iteracion += 1
+
+    def esOptimo(self, cjMenosZj):
+        # En minimización (Gran M) el óptimo se alcanza cuando ya no
+        # quedan valores Cj - Zj negativos.
+        for valor in cjMenosZj:
+            if valor < -self.TOL:
+                return False
+        return True
+
+    def elegirColumnaPivote(self, cjMenosZj):
+        # Entra la variable con el Cj - Zj más negativo (igual al criterio
+        # usado a mano: "8 - 6M" es mucho más negativo que "3 - 2M").
+        mejorIndice = 0
+        mejorValor = cjMenosZj[0]
+
+        for j in range(1, len(cjMenosZj)):
+            if cjMenosZj[j] < mejorValor:
+                mejorValor = cjMenosZj[j]
+                mejorIndice = j
+
+        return mejorIndice
+
+    def verificarFactibilidad(self):
+        # Si alguna variable artificial queda básica con valor positivo,
+        # el modelo no tiene solución factible.
+        for i, variable in enumerate(self.variablesBasicas):
+            if variable in self.indicesArtificiales:
+                valor = self.tabla[i][self.totalColumnas]
+                if valor > self.TOL:
+                    raise ValueError(
+                        "El problema no tiene solución factible (una "
+                        "variable artificial permanece en la base con "
+                        "valor positivo)."
+                    )
+
+
 # graficador.py
 import numpy as np
 from scipy.spatial import ConvexHull
@@ -719,8 +901,8 @@ class interfaz(ctk.CTk):
                            variable=self.metodoSeleccionado,
                            font=ctk.CTkFont(size=13)).grid(row=0, column=2, padx=15, pady=12)
 
-        # Tipo de objetivo (solo aplica al método gráfico)
-        ctk.CTkLabel(metodo_frame, text="Tipo de objetivo (solo gráfico):",
+        # Tipo de objetivo (aplica a gráfico y a simplex)
+        ctk.CTkLabel(metodo_frame, text="Tipo de objetivo:",
                      font=ctk.CTkFont(size=14, weight="bold"),
                      text_color="#334155").grid(row=1, column=0, sticky="w", padx=15, pady=12)
 
@@ -788,13 +970,13 @@ class interfaz(ctk.CTk):
             solver = MetodoGrafico(coefObjetivo, self.modelo.restricciones,
                                     tipo=self.tipoObjetivo.get())
         else:
-            # El simplex clásico implementado aquí solo maximiza.
             if self.tipoObjetivo.get() == "min":
-                messagebox.showerror(
-                    "Minimización no disponible en Simplex"
-                )
-                return
-            solver = MetodoSimplex(coefObjetivo, self.modelo.restricciones)
+                # Minimización con Simplex -> método de la Gran M
+                solver = MetodoSimplexGranM(coefObjetivo, self.modelo.restricciones,
+                                             tipo="min")
+            else:
+                solver = MetodoSimplex(coefObjetivo, self.modelo.restricciones,
+                                        tipo="max")
  
         salidaCapturada = io.StringIO()
         try:
