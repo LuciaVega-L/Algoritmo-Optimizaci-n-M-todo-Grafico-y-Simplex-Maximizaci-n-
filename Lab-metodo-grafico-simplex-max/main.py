@@ -293,6 +293,7 @@ class MetodoSimplex(Solver):
         for j in range(self.numVariables):
             costos[j] = self.coefObjetivo[j]
 
+        #matriz 
         for i in range(numRestricciones):
             coeficientes, operador, independiente = restriccionesNormalizadas[i]
 
