@@ -490,23 +490,7 @@ class MetodoSimplex(Solver):
 
 
 class MetodoSimplexGranM(MetodoSimplex):
-    """
-    Resuelve problemas de MINIMIZACIÓN con el método simplex usando la
-    técnica de la Gran M (variables artificiales penalizadas con un
-    valor M muy grande en la función objetivo).
-
-    Reutiliza de MetodoSimplex todo lo que no depende del sentido de
-    optimización (cálculo de costos reducidos, pivoteo, prueba de razón
-    mínima y registro de iteraciones) y solo redefine:
-        - construirTableauInicial: agrega holgura/superávit/artificiales
-          según el operador de cada restricción (<=, >=, =).
-        - elegirColumnaPivote: entra la variable con el Cj-Zj MÁS NEGATIVO
-          (en minimización, ese es el criterio de mejora).
-        - esOptimo: es óptimo cuando ya no quedan Cj-Zj negativos.
-        - verificarFactibilidad: si al final queda una variable artificial
-          básica con valor positivo, el problema no tiene solución factible.
-    """
-
+   
     # Valor grande usado para penalizar las variables artificiales.
     # Se usa como número (no simbólico), igual a como se verificó a mano
     # reemplazando M por 1.000.000 para comparar los Cj - Zj.
