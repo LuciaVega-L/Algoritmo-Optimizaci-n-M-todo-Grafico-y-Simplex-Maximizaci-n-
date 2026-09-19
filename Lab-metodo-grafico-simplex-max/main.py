@@ -1,12 +1,8 @@
 from itertools import combinations
 import numpy as np
-import re
 from collections import namedtuple
 
-
 Restriccion = namedtuple('Restriccion', ['coeficientes', 'operador', 'independiente'])
-
-
 class Modelo:
     def __init__(self):
         self.coesFuncObj = []
@@ -65,10 +61,8 @@ class Modelo:
         self.coesFuncObj.clear()
         self.restricciones.clear()
 
-
 # solver.py
 from abc import ABC, abstractmethod
-
 class Solver(ABC):
     def __init__(self, coefObjetivo, restricciones, tipo='max'):
         self.coefObjetivo = coefObjetivo
@@ -79,10 +73,8 @@ class Solver(ABC):
     def resolver(self):
         pass
 
-import numpy as np
 from scipy.spatial import ConvexHull
 import matplotlib.pyplot as plt
-
 class Graficador:
 
     def __init__(self, restricciones, vertices, puntoOptimo, zOptimo):
@@ -95,9 +87,7 @@ class Graficador:
 
     def graficar(self, mostrar=True):
         self.figura, self.ax = plt.subplots()
-
         self.dibujarRegionFactible()
-
         limite = self.calcularLimite()
         self.dibujarRestricciones(limite)
         self.dibujarPuntoOptimo()
@@ -139,14 +129,11 @@ class Graficador:
             else:
                 x_constante = r.independiente / a1
                 self.ax.axvline(x_constante)
-
     def dibujarPuntoOptimo(self):
         etiqueta = f"Óptimo Z={round(self.zOptimo, 2)}"
         self.ax.scatter(self.puntoOptimo[0], self.puntoOptimo[1], color='red',
                          zorder=5, label=etiqueta)
-
 class MetodoGrafico(Solver):
- 
     TOL = 1e-9
 
     def resolver(self):
@@ -160,17 +147,14 @@ class MetodoGrafico(Solver):
         vertices = self.filtrarFactibles(intersecciones)
         if len(vertices) == 0:
             raise ValueError("No se encontró una región factible.")
-
         if self.esNoAcotado(vertices):
             if self.tipo == 'min':
                 mensaje = (
-                    "El problema no tiene solución óptima: la región factible es "
-                    "no acotada, Z decrece indefinidamente"
+                    "El problema no tiene solución óptima: la región factible es no acotada, Z decrece indefinidamente"
                 )
             else:
                 mensaje = (
-                    "El problema no tiene solución óptima: la región factible es "
-                    "no acotada, Z crece indefinidamente"
+                    "El problema no tiene solución óptima: la región factible es no acotada, Z crece indefinidamente"
                 )
             raise ValueError(mensaje)
 
@@ -305,9 +289,6 @@ class MetodoGrafico(Solver):
 
         return puntoOptimo, zOptimo
 
-import numpy as np
-
-
 class MetodoSimplex(Solver):
     TOL = 1e-9
 
@@ -335,8 +316,7 @@ class MetodoSimplex(Solver):
 
             if operador == '=':
                 raise ValueError(
-                    "El simplex clásico (sin variables artificiales) no "
-                    "soporta restricciones de igualdad."
+                    "El simplex clásico (sin variables artificiales) no soporta restricciones de igualdad."
                 )
 
             if operador == '>=':
@@ -347,7 +327,6 @@ class MetodoSimplex(Solver):
             normalizadas.append((coeficientes, operador, independiente))
 
         return normalizadas
-
     def construirTableauInicial(self, restriccionesNormalizadas):
         numRestricciones = len(restriccionesNormalizadas)
         totalColumnas = self.numVariables + numRestricciones
@@ -375,7 +354,6 @@ class MetodoSimplex(Solver):
         self.costos = costos
         self.variablesBasicas = variablesBasicas
         self.totalColumnas = totalColumnas
-
         # Nombres legibles de cada columna
         self.nombresColumnas = []
         for j in range(self.numVariables):
@@ -473,13 +451,11 @@ class MetodoSimplex(Solver):
             z += cB[i] * self.tabla[i][self.totalColumnas]
 
         return cjMenosZj, z
-
     def esOptimo(self, cjMenosZj):
         for valor in cjMenosZj:
             if valor > self.TOL:
                 return False
         return True
-
     def elegirColumnaPivote(self, cjMenosZj):
         mejorIndice = 0
         mejorValor = cjMenosZj[0]
@@ -490,7 +466,6 @@ class MetodoSimplex(Solver):
                 mejorIndice = j
 
         return mejorIndice
-
     def elegirFilaPivote(self, columnaPivote):
         mejorFila = None
         mejorRazon = None
@@ -506,7 +481,6 @@ class MetodoSimplex(Solver):
                     mejorFila = i
 
         return mejorFila
-
     def pivotear(self, filaPivote, columnaPivote):
         elementoPivote = self.tabla[filaPivote][columnaPivote]
         self.tabla[filaPivote] = self.tabla[filaPivote] / elementoPivote
@@ -517,7 +491,6 @@ class MetodoSimplex(Solver):
                 self.tabla[i] = self.tabla[i] - factor * self.tabla[filaPivote]
 
         self.variablesBasicas[filaPivote] = columnaPivote
-
     def extraerSolucion(self):
         valores = np.zeros(self.totalColumnas)
 
@@ -530,7 +503,6 @@ class MetodoSimplex(Solver):
         _, zOptimo = self.calcularCostosReducidos()
 
         return puntoOptimo, zOptimo
-
     def registrarIteracion(self, fase, iteracion, cjMenosZj, z):
         nombreVariablesBasicas = []
         for indice in self.variablesBasicas:
@@ -553,9 +525,6 @@ class MetodoSimplex(Solver):
         print(np.round(self.tabla, 3))
         print("Cj - Zj:", np.round(cjMenosZj, 3))
         print("Z actual:", round(z, 3))
-import numpy as np
-
-import numpy as np
 import numpy as np
 
 class MetodoSimplexGranM(MetodoSimplex):
@@ -703,12 +672,8 @@ class MetodoSimplexGranM(MetodoSimplex):
                 valor = self.tabla[i][self.totalColumnas]
                 if valor > self.TOL:
                     raise ValueError(
-                        "El problema no tiene solución factible (una "
-                        "variable artificial permanece en la base con "
-                        "valor positivo)."
+                        "El problema no tiene solución factible (una variable artificial permanece en la base con valor positivo)."
                     )
-
-
 import customtkinter as ctk
 from tkinter import messagebox
 import contextlib
@@ -719,10 +684,7 @@ from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
 ctk.set_appearance_mode("Light")
 ctk.set_default_color_theme("blue")
 
-
 class interfaz(ctk.CTk):
-
- 
     def __init__(self):
         super().__init__()
         self.modelo = Modelo()
@@ -740,57 +702,44 @@ class interfaz(ctk.CTk):
  
         self.entradasFuncObj = []       
         self.filasRestricciones = []    
- 
         self.card = ctk.CTkFrame(self, fg_color="#FFFFFF", corner_radius=16,
-                                  border_width=1, border_color="#E2E8F0")
+            border_width=1, border_color="#E2E8F0")
         self.card.pack(fill="both", expand=True, padx=25, pady=25)
- 
         self.contenedor = ctk.CTkScrollableFrame(self.card, fg_color="transparent")
         self.contenedor.pack(fill="both", expand=True, padx=20, pady=20)
- 
         self.construirFormularioInicial()
- 
     def limpiarContenedor(self):
         for widget in self.contenedor.winfo_children():
             widget.destroy()
- 
     def construirFormularioInicial(self):
         self.limpiarContenedor()
  
         ctk.CTkLabel(self.contenedor, text="Configuración del Modelo",
                      font=ctk.CTkFont(family="Segoe UI", size=22, weight="bold"),
                      text_color="#1E293B").pack(anchor="w", pady=(10, 2))
- 
         ctk.CTkLabel(self.contenedor,
                      text="Ingrese los parámetros generales para iniciar la optimización",
                      font=ctk.CTkFont(family="Segoe UI", size=13),
                      text_color="#64748B").pack(anchor="w", pady=(0, 25))
- 
         form_frame = ctk.CTkFrame(self.contenedor, fg_color="#F8FAFC", corner_radius=12,
                                    border_width=1, border_color="#F1F5F9")
         form_frame.pack(fill="x", pady=10, ipadx=10, ipady=10)
- 
         ctk.CTkLabel(form_frame, text="Número de variables de decisión:",
                      font=ctk.CTkFont(size=14, weight="bold"),
                      text_color="#334155").grid(row=0, column=0, sticky="w", padx=20, pady=15)
- 
         self.entradaNumVariables = ctk.CTkEntry(form_frame, placeholder_text="Ej: 2",
                                                   width=180, height=38, corner_radius=8)
         self.entradaNumVariables.grid(row=0, column=1, padx=20, pady=15)
- 
         ctk.CTkLabel(form_frame, text="Número de restricciones:",
                      font=ctk.CTkFont(size=14, weight="bold"),
                      text_color="#334155").grid(row=1, column=0, sticky="w", padx=20, pady=15)
- 
         self.entradaNumRestricciones = ctk.CTkEntry(form_frame, placeholder_text="Ej: 3",
                                                       width=180, height=38, corner_radius=8)
         self.entradaNumRestricciones.grid(row=1, column=1, padx=20, pady=15)
- 
         ctk.CTkButton(self.contenedor, text="Continuar →",
                       font=ctk.CTkFont(size=14, weight="bold"), height=42, corner_radius=8,
                       fg_color="#3B82F6", hover_color="#2563EB",
                       command=self.generarCamposModelo).pack(anchor="e", pady=25)
- 
     def generarCamposModelo(self):
         try:
             self.numVariables = int(self.entradaNumVariables.get())
@@ -802,30 +751,23 @@ class interfaz(ctk.CTk):
         if self.numVariables <= 0 or self.numRestricciones <= 0:
             messagebox.showerror("Error", "Los valores deben ser mayores a 0.")
             return
- 
         self.limpiarContenedor()
         self.entradasFuncObj = []
         self.filasRestricciones = []
- 
         ctk.CTkLabel(self.contenedor, text="Definición de Ecuaciones",
                      font=ctk.CTkFont(family="Segoe UI", size=22, weight="bold"),
                      text_color="#1E293B").pack(anchor="w", pady=(10, 2))
- 
         ctk.CTkLabel(self.contenedor,
                      text="Ingrese el coeficiente de cada variable (deje vacío = 0)",
                      font=ctk.CTkFont(size=13), text_color="#64748B").pack(anchor="w", pady=(0, 20))
- 
         #  Función objetivo 
         obj_frame = ctk.CTkFrame(self.contenedor, fg_color="#F8FAFC", corner_radius=10)
         obj_frame.pack(fill="x", pady=10, ipady=10, padx=2)
- 
         ctk.CTkLabel(obj_frame, text="Función objetivo: Z =",
                      font=ctk.CTkFont(size=14, weight="bold"),
                      text_color="#334155").grid(row=0, column=0, sticky="w", padx=15, pady=12)
- 
         self._construirFilaCoeficientes(obj_frame, fila=0, columnaInicial=1,
                                          listaDestino=self.entradasFuncObj)
- 
         # Restricciones 
         rest_frame = ctk.CTkFrame(self.contenedor, fg_color="#F8FAFC", corner_radius=10)
         rest_frame.pack(fill="x", pady=10, ipady=10, padx=2)
@@ -839,7 +781,6 @@ class interfaz(ctk.CTk):
             columna = self._construirFilaCoeficientes(
                 rest_frame, fila=i, columnaInicial=1, listaDestino=coeficientesEntradas
             )
- 
             operador = ctk.CTkComboBox(rest_frame, values=["<=", ">=", "="],
                                         width=70, state="readonly")
             operador.set("<=")
@@ -855,36 +796,28 @@ class interfaz(ctk.CTk):
                 "operador": operador,
                 "independiente": independiente,
             })
- 
         # Método de solución 
         metodo_frame = ctk.CTkFrame(self.contenedor, fg_color="#F8FAFC", corner_radius=10)
         metodo_frame.pack(fill="x", pady=10, ipady=5)
- 
         ctk.CTkLabel(metodo_frame, text="Método de solución:",
                      font=ctk.CTkFont(size=14, weight="bold"),
                      text_color="#334155").grid(row=0, column=0, sticky="w", padx=15, pady=12)
- 
         ctk.CTkRadioButton(metodo_frame, text="Gráfico", value="grafico",
                            variable=self.metodoSeleccionado,
                            font=ctk.CTkFont(size=13)).grid(row=0, column=1, padx=15, pady=12)
- 
         ctk.CTkRadioButton(metodo_frame, text="Simplex", value="simplex",
                            variable=self.metodoSeleccionado,
                            font=ctk.CTkFont(size=13)).grid(row=0, column=2, padx=15, pady=12)
-
         # Tipo de objetivo (aplica a gráfico y a simplex)
         ctk.CTkLabel(metodo_frame, text="Tipo de objetivo:",
                      font=ctk.CTkFont(size=14, weight="bold"),
                      text_color="#334155").grid(row=1, column=0, sticky="w", padx=15, pady=12)
-
         ctk.CTkRadioButton(metodo_frame, text="Maximizar", value="max",
                            variable=self.tipoObjetivo,
                            font=ctk.CTkFont(size=13)).grid(row=1, column=1, padx=15, pady=12)
-
         ctk.CTkRadioButton(metodo_frame, text="Minimizar", value="min",
                            variable=self.tipoObjetivo,
                            font=ctk.CTkFont(size=13)).grid(row=1, column=2, padx=15, pady=12)
- 
         # ---- Botones ----
         btn_box = ctk.CTkFrame(self.contenedor, fg_color="transparent")
         btn_box.pack(fill="x", pady=20)
@@ -897,7 +830,6 @@ class interfaz(ctk.CTk):
                      font=ctk.CTkFont(size=14, weight="bold"), fg_color="#10B981",
                      hover_color="#059669", height=40, corner_radius=8,
                      command=self.resolverModelo).pack(side="right")
- 
     def _construirFilaCoeficientes(self, contenedorPadre, fila, columnaInicial, listaDestino):
         columna = columnaInicial
  
@@ -914,7 +846,7 @@ class interfaz(ctk.CTk):
             columna += 1
  
         return columna
- 
+
     def resolverModelo(self):
         self.modelo.limpiar()
  
@@ -930,7 +862,6 @@ class interfaz(ctk.CTk):
                 self.modelo.agregarRestriccion(
                     coeficientes, operador, independiente, self.numVariables, i
                 )
- 
         except ValueError as error:
             messagebox.showerror("Error en los datos", str(error))
             return
@@ -948,7 +879,6 @@ class interfaz(ctk.CTk):
             else:
                 solver = MetodoSimplex(coefObjetivo, self.modelo.restricciones,
                                         tipo="max")
- 
         salidaCapturada = io.StringIO()
         try:
             with contextlib.redirect_stdout(salidaCapturada):
@@ -958,10 +888,8 @@ class interfaz(ctk.CTk):
             return
  
         self.mostrarResultado(solver, puntoOptimo, zOptimo)
-        
     def mostrarResultado(self, solver, puntoOptimo, zOptimo):
         self.limpiarContenedor()
-
         # Título
         ctk.CTkLabel(
             self.contenedor,
@@ -969,7 +897,6 @@ class interfaz(ctk.CTk):
             font=ctk.CTkFont(family="Segoe UI", size=22, weight="bold"),
             text_color="#1E293B"
         ).pack(anchor="w", pady=(10, 15))
-
         resumen_box = ctk.CTkFrame(
             self.contenedor,
             fg_color="#EFF6FF",
@@ -978,32 +905,26 @@ class interfaz(ctk.CTk):
             corner_radius=12
         )
         resumen_box.pack(fill="x", pady=(0, 20), ipady=10, ipadx=10)
-
         vars_str = ",  ".join([f"x{i+1} = {round(val, 4)}" for i, val in enumerate(puntoOptimo)])
-
         tipoTexto = "Maximizar" if getattr(solver, "tipo", "max") == "max" else "Minimizar"
-
         ctk.CTkLabel(
             resumen_box,
             text=f"Tipo de objetivo: {tipoTexto}",
             font=ctk.CTkFont(size=12),
             text_color="#1E40AF"
         ).pack(anchor="w", padx=15, pady=(6, 0))
-
         ctk.CTkLabel(
             resumen_box,
             text=f"Solución Óptima:  {vars_str}",
             font=ctk.CTkFont(size=14, weight="bold"),
             text_color="#1E40AF"
         ).pack(anchor="w", padx=15, pady=2)
-
         ctk.CTkLabel(
             resumen_box,
             text=f"Valor Óptimo Z = {round(zOptimo, 4)}",
             font=ctk.CTkFont(size=18, weight="bold"),
             text_color="#1D4ED8"
         ).pack(anchor="w", padx=15, pady=4)
-
         if hasattr(solver, "figura"):
             canvas_frame = ctk.CTkFrame(self.contenedor, fg_color="#FFFFFF", corner_radius=10)
             canvas_frame.pack(fill="both", expand=True, pady=10)
@@ -1011,10 +932,8 @@ class interfaz(ctk.CTk):
             canvas = FigureCanvasTkAgg(solver.figura, master=canvas_frame)
             canvas.draw()
             canvas.get_tk_widget().pack(fill="both", expand=True, padx=10, pady=10)
-
         if hasattr(solver, "historial"):
             self.mostrarIteracionesSimplex(solver.historial)
-
         # Botón Nuevo Modelo
         ctk.CTkButton(
             self.contenedor,
@@ -1026,8 +945,6 @@ class interfaz(ctk.CTk):
             corner_radius=8,
             command=self.construirFormularioInicial
         ).pack(anchor="w", pady=20)
-
-
     def mostrarIteracionesSimplex(self, historial):
         notebook = ttk.Notebook(self.contenedor)
         notebook.pack(fill="both", expand=True, pady=10)
@@ -1051,13 +968,10 @@ class interfaz(ctk.CTk):
                 valores = [round(v, 3) for v in snapshot["tabla"][i]]
                 fila = [nombreBase] + valores
                 tabla.insert("", "end", values=fila)
-
             valoresCjMenosZj = [round(v, 3) for v in snapshot["cjMenosZj"]]
             filaZ = ["Z"] + valoresCjMenosZj + [round(snapshot["z"], 3)]
             tabla.insert("", "end", values=filaZ, tags=("filaZ",))
-
             tabla.tag_configure("filaZ", background="#fff3cd")
-
 if __name__ == "__main__":
     app = interfaz()
     app.mainloop()
