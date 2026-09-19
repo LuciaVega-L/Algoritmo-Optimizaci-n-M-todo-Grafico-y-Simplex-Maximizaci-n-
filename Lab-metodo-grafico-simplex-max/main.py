@@ -3,9 +3,7 @@ import numpy as np
 import re
 from collections import namedtuple
 
-
 Restriccion = namedtuple('Restriccion', ['coeficientes', 'operador', 'independiente'])
-
 
 class Modelo:
     def __init__(self):
@@ -487,33 +485,35 @@ class MetodoSimplex(Solver):
         print(np.round(self.tabla, 3))
         print("Cj - Zj:", np.round(cjMenosZj, 3))
         print("Z actual:", round(z, 3))
+import numpy as np
 
+import numpy as np
+import numpy as np
 
 class MetodoSimplexGranM(MetodoSimplex):
-   
-    # Valor grande usado para penalizar las variables artificiales.
-    # Se usa como número (no simbólico), igual a como se verificó a mano
-    # reemplazando M por 1.000.000 para comparar los Cj - Zj.
-    M = 1_000_000
+    # Valor numérico grande para penalizar variables artificiales
+    M = 1_000_000.0
 
     def resolver(self):
-        print("resolviendo el modelo utilizando el método simplex (Gran M)...")
-
+        print(f"Resolviendo el modelo utilizando el método simplex (Gran M - {self.tipo})...")
         self.numVariables = len(self.coefObjetivo)
-        self.construirTableauInicial()
+        
+        # Si es minimización, convertimos los coeficientes a equivalente de maximizar (-Z)
+        if self.tipo == 'min':
+            self.coefObjetivoEfectivos = [-c for c in self.coefObjetivo]
+        else:
+            self.coefObjetivoEfectivos = list(self.coefObjetivo)
 
+        self.construirTableauInicial()
         self.optimizarGranM()
         self.verificarFactibilidad()
 
         puntoOptimo, zOptimo = self.extraerSolucion()
-
         return puntoOptimo, zOptimo
 
     def normalizarSignos(self, restricciones):
-        # Si el lado derecho es negativo, se multiplica la fila por -1
-        # (y se invierte el operador <= / >=) para que el RHS sea >= 0.
+        """Convierte restricciones con término independiente negativo a positivo volteando el operador."""
         normalizadas = []
-
         for r in restricciones:
             coeficientes = list(r.coeficientes)
             operador = r.operador
@@ -526,7 +526,6 @@ class MetodoSimplexGranM(MetodoSimplex):
                     operador = '>='
                 elif operador == '>=':
                     operador = '<='
-                # '=' se mantiene igual
 
             normalizadas.append((coeficientes, operador, independiente))
 
@@ -536,19 +535,15 @@ class MetodoSimplexGranM(MetodoSimplex):
         restriccionesProc = self.normalizarSignos(self.restricciones)
         numRestricciones = len(restriccionesProc)
 
-        # Se define, en el mismo orden que las restricciones, qué columnas
-        # extra necesita cada una: holgura (<=), superávit + artificial (>=)
-        # o solo artificial (=). Esto reproduce el orden x1,x2,s1,A1,s2,A2...
-        # que se ve en el tablero hecho a mano.
-        columnasExtra = []  # (tipo, fila, coeficiente, costo)
+        columnasExtra = []
         for i, (coeficientes, operador, independiente) in enumerate(restriccionesProc):
             if operador == '<=':
-                columnasExtra.append(('slack', i, 1, 0))
+                columnasExtra.append(('slack', i, 1, 0.0))
             elif operador == '>=':
-                columnasExtra.append(('surplus', i, -1, 0))
-                columnasExtra.append(('artificial', i, 1, self.M))
+                columnasExtra.append(('surplus', i, -1, 0.0))
+                columnasExtra.append(('artificial', i, 1, -self.M))
             else:  # '='
-                columnasExtra.append(('artificial', i, 1, self.M))
+                columnasExtra.append(('artificial', i, 1, -self.M))
 
         totalColumnas = self.numVariables + len(columnasExtra)
 
@@ -556,16 +551,16 @@ class MetodoSimplexGranM(MetodoSimplex):
         costos = np.zeros(totalColumnas)
         variablesBasicas = [None] * numRestricciones
         nombresColumnas = [f"x{j + 1}" for j in range(self.numVariables)]
+        nombresColumnas += [None] * len(columnasExtra)
 
         for j in range(self.numVariables):
-            costos[j] = self.coefObjetivo[j]
+            costos[j] = self.coefObjetivoEfectivos[j]
 
         for i, (coeficientes, operador, independiente) in enumerate(restriccionesProc):
             for j in range(self.numVariables):
                 tabla[i][j] = coeficientes[j]
             tabla[i][totalColumnas] = independiente
 
-        contadorSlack = 0
         contadorArtificial = 0
         indicesArtificiales = []
 
@@ -575,20 +570,13 @@ class MetodoSimplexGranM(MetodoSimplex):
             costos[col] = costo
 
             if tipo == 'slack':
-                contadorSlack += 1
-                nombresColumnas.append(f"s{contadorSlack}")
+                nombresColumnas[col] = f"s{fila + 1}"
                 variablesBasicas[fila] = col
-
             elif tipo == 'surplus':
-                contadorSlack += 1
-                nombresColumnas.append(f"s{contadorSlack}")
-                # el superávit no puede ser variable básica inicial
-                # (queda con coeficiente -1), la básica de esa fila
-                # será la artificial que se agrega justo después
-
+                nombresColumnas[col] = f"e{fila + 1}"
             else:  # 'artificial'
                 contadorArtificial += 1
-                nombresColumnas.append(f"A{contadorArtificial}")
+                nombresColumnas[col] = f"A{contadorArtificial}"
                 variablesBasicas[fila] = col
                 indicesArtificiales.append(col)
 
@@ -602,7 +590,6 @@ class MetodoSimplexGranM(MetodoSimplex):
 
     def optimizarGranM(self):
         iteracion = 0
-
         while True:
             cjMenosZj, z = self.calcularCostosReducidos()
             self.registrarIteracion("Gran M", iteracion, cjMenosZj, z)
@@ -620,29 +607,29 @@ class MetodoSimplexGranM(MetodoSimplex):
             iteracion += 1
 
     def esOptimo(self, cjMenosZj):
-        # En minimización (Gran M) el óptimo se alcanza cuando ya no
-        # quedan valores Cj - Zj negativos.
         for valor in cjMenosZj:
-            if valor < -self.TOL:
+            if valor > self.TOL:
                 return False
         return True
 
     def elegirColumnaPivote(self, cjMenosZj):
-        # Entra la variable con el Cj - Zj más negativo (igual al criterio
-        # usado a mano: "8 - 6M" es mucho más negativo que "3 - 2M").
         mejorIndice = 0
         mejorValor = cjMenosZj[0]
 
         for j in range(1, len(cjMenosZj)):
-            if cjMenosZj[j] < mejorValor:
+            if cjMenosZj[j] > mejorValor:
                 mejorValor = cjMenosZj[j]
                 mejorIndice = j
 
         return mejorIndice
 
+    def extraerSolucion(self):
+        puntoOptimo, zOptimo = super().extraerSolucion()
+        if self.tipo == 'min':
+            zOptimo = -zOptimo
+        return puntoOptimo, zOptimo
+
     def verificarFactibilidad(self):
-        # Si alguna variable artificial queda básica con valor positivo,
-        # el modelo no tiene solución factible.
         for i, variable in enumerate(self.variablesBasicas):
             if variable in self.indicesArtificiales:
                 valor = self.tabla[i][self.totalColumnas]
@@ -652,76 +639,6 @@ class MetodoSimplexGranM(MetodoSimplex):
                         "variable artificial permanece en la base con "
                         "valor positivo)."
                     )
-
-
-# graficador.py
-import numpy as np
-from scipy.spatial import ConvexHull
-import matplotlib.pyplot as plt
-
-class Graficador:
-
-    def __init__(self, restricciones, vertices, puntoOptimo, zOptimo):
-        self.restricciones = restricciones
-        self.puntos = np.array(vertices)
-        self.puntoOptimo = puntoOptimo
-        self.zOptimo = zOptimo
-        self.figura = None
-        self.ax = None
-
-    def graficar(self, mostrar=True):
-        self.figura, self.ax = plt.subplots()
-
-        self.dibujarRegionFactible()
-
-        limite = self.calcularLimite()
-        self.dibujarRestricciones(limite)
-        self.dibujarPuntoOptimo()
-
-        self.ax.set_xlim(0, limite)
-        self.ax.set_ylim(0, limite)
-        self.ax.set_xlabel("x1")
-        self.ax.set_ylabel("x2")
-        self.ax.legend()
-
-        if mostrar:
-            plt.show()
-
-        return self.figura
-
-    def dibujarRegionFactible(self):
-        if len(self.puntos) >= 3:
-            hull = ConvexHull(self.puntos)
-            orden = self.puntos[hull.vertices]
-            self.ax.fill(orden[:, 0], orden[:, 1], alpha=0.3, label="Región factible")
-
-    def calcularLimite(self):
-        if self.puntos.size > 0:
-            return self.puntos.max() * 1.2
-        else:
-            return 10
-
-    def dibujarRestricciones(self, limite):
-        x1_vals = np.linspace(0, limite, 200)
-
-        for r in self.restricciones:
-            a1 = r.coeficientes[0]
-            a2 = r.coeficientes[1]
-
-            if a2 != 0:
-                x2_vals = (r.independiente - a1 * x1_vals) / a2
-                etiqueta = f"{a1}x1 + {a2}x2 {r.operador} {r.independiente}"
-                self.ax.plot(x1_vals, x2_vals, label=etiqueta)
-            else:
-                x_constante = r.independiente / a1
-                self.ax.axvline(x_constante)
-
-    def dibujarPuntoOptimo(self):
-        etiqueta = f"Óptimo Z={round(self.zOptimo, 2)}"
-        self.ax.scatter(self.puntoOptimo[0], self.puntoOptimo[1], color='red',
-                         zorder=5, label=etiqueta)
-
-
 import customtkinter as ctk
 from tkinter import messagebox
 import contextlib
@@ -910,7 +827,6 @@ class interfaz(ctk.CTk):
                      font=ctk.CTkFont(size=14, weight="bold"), fg_color="#10B981",
                      hover_color="#059669", height=40, corner_radius=8,
                      command=self.resolverModelo).pack(side="right")
- 
     def _construirFilaCoeficientes(self, contenedorPadre, fila, columnaInicial, listaDestino):
         columna = columnaInicial
  
@@ -927,7 +843,6 @@ class interfaz(ctk.CTk):
             columna += 1
  
         return columna
- 
     def resolverModelo(self):
         self.modelo.limpiar()
  
@@ -1002,21 +917,18 @@ class interfaz(ctk.CTk):
             font=ctk.CTkFont(size=12),
             text_color="#1E40AF"
         ).pack(anchor="w", padx=15, pady=(6, 0))
-
         ctk.CTkLabel(
             resumen_box,
             text=f"Solución Óptima:  {vars_str}",
             font=ctk.CTkFont(size=14, weight="bold"),
             text_color="#1E40AF"
         ).pack(anchor="w", padx=15, pady=2)
-
         ctk.CTkLabel(
             resumen_box,
             text=f"Valor Óptimo Z = {round(zOptimo, 4)}",
             font=ctk.CTkFont(size=18, weight="bold"),
             text_color="#1D4ED8"
         ).pack(anchor="w", padx=15, pady=4)
-
         if hasattr(solver, "figura"):
             canvas_frame = ctk.CTkFrame(self.contenedor, fg_color="#FFFFFF", corner_radius=10)
             canvas_frame.pack(fill="both", expand=True, pady=10)
@@ -1027,7 +939,6 @@ class interfaz(ctk.CTk):
 
         if hasattr(solver, "historial"):
             self.mostrarIteracionesSimplex(solver.historial)
-
         # Botón Nuevo Modelo
         ctk.CTkButton(
             self.contenedor,
@@ -1039,8 +950,6 @@ class interfaz(ctk.CTk):
             corner_radius=8,
             command=self.construirFormularioInicial
         ).pack(anchor="w", pady=20)
-
-
     def mostrarIteracionesSimplex(self, historial):
         notebook = ttk.Notebook(self.contenedor)
         notebook.pack(fill="both", expand=True, pady=10)
@@ -1070,7 +979,6 @@ class interfaz(ctk.CTk):
             tabla.insert("", "end", values=filaZ, tags=("filaZ",))
 
             tabla.tag_configure("filaZ", background="#fff3cd")
-
 if __name__ == "__main__":
     app = interfaz()
     app.mainloop()
