@@ -3,7 +3,9 @@ import numpy as np
 import re
 from collections import namedtuple
 
+
 Restriccion = namedtuple('Restriccion', ['coeficientes', 'operador', 'independiente'])
+
 
 class Modelo:
     def __init__(self):
@@ -76,6 +78,72 @@ class Solver(ABC):
     @abstractmethod
     def resolver(self):
         pass
+
+import numpy as np
+from scipy.spatial import ConvexHull
+import matplotlib.pyplot as plt
+
+class Graficador:
+
+    def _init_(self, restricciones, vertices, puntoOptimo, zOptimo):
+        self.restricciones = restricciones
+        self.puntos = np.array(vertices)
+        self.puntoOptimo = puntoOptimo
+        self.zOptimo = zOptimo
+        self.figura = None
+        self.ax = None
+
+    def graficar(self, mostrar=True):
+        self.figura, self.ax = plt.subplots()
+
+        self.dibujarRegionFactible()
+
+        limite = self.calcularLimite()
+        self.dibujarRestricciones(limite)
+        self.dibujarPuntoOptimo()
+
+        self.ax.set_xlim(0, limite)
+        self.ax.set_ylim(0, limite)
+        self.ax.set_xlabel("x1")
+        self.ax.set_ylabel("x2")
+        self.ax.legend()
+
+        if mostrar:
+            plt.show()
+
+        return self.figura
+
+    def dibujarRegionFactible(self):
+        if len(self.puntos) >= 3:
+            hull = ConvexHull(self.puntos)
+            orden = self.puntos[hull.vertices]
+            self.ax.fill(orden[:, 0], orden[:, 1], alpha=0.3, label="Región factible")
+
+    def calcularLimite(self):
+        if self.puntos.size > 0:
+            return self.puntos.max() * 1.2
+        else:
+            return 10
+
+    def dibujarRestricciones(self, limite):
+        x1_vals = np.linspace(0, limite, 200)
+
+        for r in self.restricciones:
+            a1 = r.coeficientes[0]
+            a2 = r.coeficientes[1]
+
+            if a2 != 0:
+                x2_vals = (r.independiente - a1 * x1_vals) / a2
+                etiqueta = f"{a1}x1 + {a2}x2 {r.operador} {r.independiente}"
+                self.ax.plot(x1_vals, x2_vals, label=etiqueta)
+            else:
+                x_constante = r.independiente / a1
+                self.ax.axvline(x_constante)
+
+    def dibujarPuntoOptimo(self):
+        etiqueta = f"Óptimo Z={round(self.zOptimo, 2)}"
+        self.ax.scatter(self.puntoOptimo[0], self.puntoOptimo[1], color='red',
+                         zorder=5, label=etiqueta)
 
 class MetodoGrafico(Solver):
  
@@ -639,6 +707,8 @@ class MetodoSimplexGranM(MetodoSimplex):
                         "variable artificial permanece en la base con "
                         "valor positivo)."
                     )
+
+
 import customtkinter as ctk
 from tkinter import messagebox
 import contextlib
@@ -827,6 +897,7 @@ class interfaz(ctk.CTk):
                      font=ctk.CTkFont(size=14, weight="bold"), fg_color="#10B981",
                      hover_color="#059669", height=40, corner_radius=8,
                      command=self.resolverModelo).pack(side="right")
+ 
     def _construirFilaCoeficientes(self, contenedorPadre, fila, columnaInicial, listaDestino):
         columna = columnaInicial
  
@@ -843,6 +914,7 @@ class interfaz(ctk.CTk):
             columna += 1
  
         return columna
+ 
     def resolverModelo(self):
         self.modelo.limpiar()
  
@@ -917,18 +989,21 @@ class interfaz(ctk.CTk):
             font=ctk.CTkFont(size=12),
             text_color="#1E40AF"
         ).pack(anchor="w", padx=15, pady=(6, 0))
+
         ctk.CTkLabel(
             resumen_box,
             text=f"Solución Óptima:  {vars_str}",
             font=ctk.CTkFont(size=14, weight="bold"),
             text_color="#1E40AF"
         ).pack(anchor="w", padx=15, pady=2)
+
         ctk.CTkLabel(
             resumen_box,
             text=f"Valor Óptimo Z = {round(zOptimo, 4)}",
             font=ctk.CTkFont(size=18, weight="bold"),
             text_color="#1D4ED8"
         ).pack(anchor="w", padx=15, pady=4)
+
         if hasattr(solver, "figura"):
             canvas_frame = ctk.CTkFrame(self.contenedor, fg_color="#FFFFFF", corner_radius=10)
             canvas_frame.pack(fill="both", expand=True, pady=10)
@@ -939,6 +1014,7 @@ class interfaz(ctk.CTk):
 
         if hasattr(solver, "historial"):
             self.mostrarIteracionesSimplex(solver.historial)
+
         # Botón Nuevo Modelo
         ctk.CTkButton(
             self.contenedor,
@@ -950,6 +1026,8 @@ class interfaz(ctk.CTk):
             corner_radius=8,
             command=self.construirFormularioInicial
         ).pack(anchor="w", pady=20)
+
+
     def mostrarIteracionesSimplex(self, historial):
         notebook = ttk.Notebook(self.contenedor)
         notebook.pack(fill="both", expand=True, pady=10)
@@ -979,6 +1057,7 @@ class interfaz(ctk.CTk):
             tabla.insert("", "end", values=filaZ, tags=("filaZ",))
 
             tabla.tag_configure("filaZ", background="#fff3cd")
+
 if __name__ == "__main__":
     app = interfaz()
     app.mainloop()
