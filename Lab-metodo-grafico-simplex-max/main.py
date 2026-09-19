@@ -85,7 +85,7 @@ import matplotlib.pyplot as plt
 
 class Graficador:
 
-    def _init_(self, restricciones, vertices, puntoOptimo, zOptimo):
+    def __init__(self, restricciones, vertices, puntoOptimo, zOptimo):
         self.restricciones = restricciones
         self.puntos = np.array(vertices)
         self.puntoOptimo = puntoOptimo
