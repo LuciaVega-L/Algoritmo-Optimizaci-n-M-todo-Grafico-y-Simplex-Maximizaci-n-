@@ -549,7 +549,6 @@ class MetodoSimplexGranM(MetodoSimplex):
         return puntoOptimo, zOptimo
 
     def normalizarSignos(self, restricciones):
-        """Convierte restricciones con término independiente negativo a positivo volteando el operador."""
         normalizadas = []
         for r in restricciones:
             coeficientes = list(r.coeficientes)
@@ -567,7 +566,6 @@ class MetodoSimplexGranM(MetodoSimplex):
             normalizadas.append((coeficientes, operador, independiente))
 
         return normalizadas
-
     def construirTableauInicial(self):
         restriccionesProc = self.normalizarSignos(self.restricciones)
         numRestricciones = len(restriccionesProc)
@@ -581,7 +579,6 @@ class MetodoSimplexGranM(MetodoSimplex):
                 columnasExtra.append(('artificial', i, 1, -self.M))
             else:  # '='
                 columnasExtra.append(('artificial', i, 1, -self.M))
-
         totalColumnas = self.numVariables + len(columnasExtra)
 
         tabla = np.zeros((numRestricciones, totalColumnas + 1))
