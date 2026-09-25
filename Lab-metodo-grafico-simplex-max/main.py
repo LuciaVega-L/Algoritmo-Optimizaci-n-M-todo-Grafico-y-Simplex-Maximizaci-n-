@@ -286,7 +286,6 @@ class MetodoGrafico(Solver):
 
         puntoOptimo = vertices[mejorIndice]
         zOptimo = mejorZ
-
         return puntoOptimo, zOptimo
 
 class MetodoSimplex(Solver):
@@ -318,7 +317,6 @@ class MetodoSimplex(Solver):
                 raise ValueError(
                     "El simplex clásico (sin variables artificiales) no soporta restricciones de igualdad."
                 )
-
             if operador == '>=':
                 coeficientes = [-c for c in coeficientes]
                 independiente = -independiente
@@ -362,8 +360,7 @@ class MetodoSimplex(Solver):
             self.nombresColumnas.append(f"s{i + 1}")
 
         self.historial = []
-
-    def corregirFactibilidad(self):
+    def corregirFactibilidad(self):#simplex dual
         iteracion = 0
 
         while True:
@@ -411,9 +408,8 @@ class MetodoSimplex(Solver):
 
         return columnaElegida
 
-    def optimizar(self):
+    def optimizar(self):#simplex clasico 
         iteracion = 0
-
         while True:
             cjMenosZj, z = self.calcularCostosReducidos()
             self.registrarIteracion("Optimización", iteracion, cjMenosZj, z)
@@ -449,10 +445,10 @@ class MetodoSimplex(Solver):
         z = 0
         for i in range(numRestricciones):
             z += cB[i] * self.tabla[i][self.totalColumnas]
-
+        #vector 
         return cjMenosZj, z
     def esOptimo(self, cjMenosZj):
-        for valor in cjMenosZj:
+        for valor in cjMenosZj:#ya no hay positivos 
             if valor > self.TOL:
                 return False
         return True
@@ -525,8 +521,8 @@ class MetodoSimplex(Solver):
         print(np.round(self.tabla, 3))
         print("Cj - Zj:", np.round(cjMenosZj, 3))
         print("Z actual:", round(z, 3))
-import numpy as np
 
+import numpy as np
 class MetodoSimplexGranM(MetodoSimplex):
     # Valor numérico grande para penalizar variables artificiales
     M = 1_000_000.0
