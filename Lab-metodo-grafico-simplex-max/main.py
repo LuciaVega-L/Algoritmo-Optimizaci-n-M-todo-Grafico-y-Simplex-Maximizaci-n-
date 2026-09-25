@@ -535,7 +535,7 @@ class MetodoSimplexGranM(MetodoSimplex):
         print(f"Resolviendo el modelo utilizando el método simplex (Gran M - {self.tipo})...")
         self.numVariables = len(self.coefObjetivo)
         
-        # Si es minimización, convertimos los coeficientes a equivalente de maximizar (-Z)
+        # (-Z)
         if self.tipo == 'min':
             self.coefObjetivoEfectivos = [-c for c in self.coefObjetivo]
         else:
@@ -590,6 +590,7 @@ class MetodoSimplexGranM(MetodoSimplex):
         nombresColumnas = [f"x{j + 1}" for j in range(self.numVariables)]
         nombresColumnas += [None] * len(columnasExtra)
 
+        #llenar tabla
         for j in range(self.numVariables):
             costos[j] = self.coefObjetivoEfectivos[j]
 
@@ -605,7 +606,7 @@ class MetodoSimplexGranM(MetodoSimplex):
             col = self.numVariables + k
             tabla[fila][col] = coeficiente
             costos[col] = costo
-
+            #nombrar
             if tipo == 'slack':
                 nombresColumnas[col] = f"s{fila + 1}"
                 variablesBasicas[fila] = col
@@ -643,7 +644,7 @@ class MetodoSimplexGranM(MetodoSimplex):
             self.pivotear(filaPivote, columnaPivote)
             iteracion += 1
 
-    def esOptimo(self, cjMenosZj):
+    def esOptimo(self, cjMenosZj): #verificar no positivos
         for valor in cjMenosZj:
             if valor > self.TOL:
                 return False
